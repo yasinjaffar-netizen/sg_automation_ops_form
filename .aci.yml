@@ -1,0 +1,164 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# EPOS Referral System — Alibaba Cloud CI/CD Pipeline
+#
+# Triggers:
+#   master     branch → staging  environment
+#   production branch → production environment
+#
+# Set ALL of the following as Variables in Alibaba DevOps → Pipeline → Variables.
+# NONE of these should ever be in git or on the ECS server as a static file —
+# the pipeline writes the .env to ECS on every deploy from these variables.
+#
+# ── Docker registry (shared) ──────────────────────────────────────────────────
+#   ACR_REGISTRY      e.g. registry.cn-singapore.aliyuncs.com
+#   ACR_NAMESPACE     e.g. epos
+#   ACR_USER          Alibaba RAM user AccessKey ID
+#   ACR_PASSWORD      Alibaba RAM user AccessKey Secret
+#
+# ── ECS SSH (shared) ──────────────────────────────────────────────────────────
+#   ECS_HOST          ECS public IP or hostname
+#   ECS_USER          SSH login user (e.g. root)
+#   SSH_PRIVATE_KEY   Base64-encoded private key:  base64 -w0 ~/.ssh/id_rsa
+#
+# ── Staging secrets (master branch) ──────────────────────────────────────────
+#   STG_HUBSPOT_ACCESS_TOKEN
+#   STG_PG_HOST
+#   STG_PG_DB
+#   STG_PG_USER
+#   STG_PG_PASSWORD
+#   STG_ALLOWED_ORIGINS   e.g. http://YOUR_ECS_IP
+#
+# ── Production secrets (production branch) ────────────────────────────────────
+#   PRD_HUBSPOT_ACCESS_TOKEN
+#   PRD_PG_HOST
+#   PRD_PG_DB
+#   PRD_PG_USER
+#   PRD_PG_PASSWORD
+#   PRD_ALLOWED_ORIGINS   e.g. https://your-domain.com
+# ─────────────────────────────────────────────────────────────────────────────
+
+stages:
+  # ─── Prepare ───────────────────────────────────────────────────────────────
+  - stage: Prepare
+    jobs:
+      - job: prepare
+        steps:
+          - run: |
+              echo "IMAGE_TAG=${PIPELINE_ID:0:6}" >> env.properties
+              echo "REGISTRY=${ACR_REGISTRY}/${ACR_NAMESPACE}" >> env.properties
+        exportEnv: env.properties
+
+  # ─── Build ─────────────────────────────────────────────────────────────────
+  - stage: Build
+    dependsOn: Prepare
+    jobs:
+      - job: build_backend
+        steps:
+          - run: |
+              docker login -u ${ACR_USER} -p ${ACR_PASSWORD} ${ACR_REGISTRY}
+              docker build \
+                -t ${REGISTRY}/epos-referral-api:${IMAGE_TAG} \
+                ./server
+              docker push ${REGISTRY}/epos-referral-api:${IMAGE_TAG}
+
+      - job: build_frontend
+        steps:
+          - run: |
+              docker login -u ${ACR_USER} -p ${ACR_PASSWORD} ${ACR_REGISTRY}
+              docker build \
+                --build-arg VITE_API_URL="" \
+                -t ${REGISTRY}/epos-referral-client:${IMAGE_TAG} \
+                ./client
+              docker push ${REGISTRY}/epos-referral-client:${IMAGE_TAG}
+
+  # ─── Deploy — Staging (master branch) ─────────────────────────────────────
+  - stage: Deploy_Staging
+    dependsOn: Build
+    trigger:
+      branches:
+        include:
+          - master
+    jobs:
+      - job: deploy_staging
+        steps:
+          - run: |
+              mkdir -p ~/.ssh
+              echo "${SSH_PRIVATE_KEY}" | base64 -d > ~/.ssh/id_rsa
+              chmod 600 ~/.ssh/id_rsa
+
+              ssh -o StrictHostKeyChecking=no ${ECS_USER}@${ECS_HOST} << EOF
+                set -e
+                mkdir -p /app/epos-referral
+                cd /app/epos-referral
+
+                # Write .env from pipeline variables — no secrets in git
+                cat > .env << DOTENV
+HUBSPOT_ACCESS_TOKEN=${STG_HUBSPOT_ACCESS_TOKEN}
+PG_HOST=${STG_PG_HOST}
+PG_PORT=5432
+PG_DB=${STG_PG_DB}
+PG_USER=${STG_PG_USER}
+PG_PASSWORD=${STG_PG_PASSWORD}
+PG_SSL_MODE=require
+ALLOWED_ORIGINS=${STG_ALLOWED_ORIGINS}
+FRONTEND_PORT=80
+DOTENV
+                chmod 600 .env
+
+                docker login -u ${ACR_USER} -p ${ACR_PASSWORD} ${ACR_REGISTRY}
+
+                docker pull ${REGISTRY}/epos-referral-api:${IMAGE_TAG}
+                docker pull ${REGISTRY}/epos-referral-client:${IMAGE_TAG}
+
+                docker tag ${REGISTRY}/epos-referral-api:${IMAGE_TAG}    ${REGISTRY}/epos-referral-api:latest
+                docker tag ${REGISTRY}/epos-referral-client:${IMAGE_TAG} ${REGISTRY}/epos-referral-client:latest
+
+                docker compose up -d --no-build
+                docker image prune -f
+              EOF
+
+  # ─── Deploy — Production (production branch) ──────────────────────────────
+  - stage: Deploy_Production
+    dependsOn: Build
+    trigger:
+      branches:
+        include:
+          - production
+    jobs:
+      - job: deploy_production
+        steps:
+          - run: |
+              mkdir -p ~/.ssh
+              echo "${SSH_PRIVATE_KEY}" | base64 -d > ~/.ssh/id_rsa
+              chmod 600 ~/.ssh/id_rsa
+
+              ssh -o StrictHostKeyChecking=no ${ECS_USER}@${ECS_HOST} << EOF
+                set -e
+                mkdir -p /app/epos-referral
+                cd /app/epos-referral
+
+                # Write .env from pipeline variables — no secrets in git
+                cat > .env << DOTENV
+HUBSPOT_ACCESS_TOKEN=${PRD_HUBSPOT_ACCESS_TOKEN}
+PG_HOST=${PRD_PG_HOST}
+PG_PORT=5432
+PG_DB=${PRD_PG_DB}
+PG_USER=${PRD_PG_USER}
+PG_PASSWORD=${PRD_PG_PASSWORD}
+PG_SSL_MODE=require
+ALLOWED_ORIGINS=${PRD_ALLOWED_ORIGINS}
+FRONTEND_PORT=80
+DOTENV
+                chmod 600 .env
+
+                docker login -u ${ACR_USER} -p ${ACR_PASSWORD} ${ACR_REGISTRY}
+
+                docker pull ${REGISTRY}/epos-referral-api:${IMAGE_TAG}
+                docker pull ${REGISTRY}/epos-referral-client:${IMAGE_TAG}
+
+                docker tag ${REGISTRY}/epos-referral-api:${IMAGE_TAG}    ${REGISTRY}/epos-referral-api:latest
+                docker tag ${REGISTRY}/epos-referral-client:${IMAGE_TAG} ${REGISTRY}/epos-referral-client:latest
+
+                docker compose up -d --no-build
+                docker image prune -f
+              EOF
