@@ -1,164 +1,376 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# EPOS Referral System — Alibaba Cloud CI/CD Pipeline
-#
-# Triggers:
-#   master     branch → staging  environment
-#   production branch → production environment
-#
-# Set ALL of the following as Variables in Alibaba DevOps → Pipeline → Variables.
-# NONE of these should ever be in git or on the ECS server as a static file —
-# the pipeline writes the .env to ECS on every deploy from these variables.
-#
-# ── Docker registry (shared) ──────────────────────────────────────────────────
-#   ACR_REGISTRY      e.g. registry.cn-singapore.aliyuncs.com
-#   ACR_NAMESPACE     e.g. epos
-#   ACR_USER          Alibaba RAM user AccessKey ID
-#   ACR_PASSWORD      Alibaba RAM user AccessKey Secret
-#
-# ── ECS SSH (shared) ──────────────────────────────────────────────────────────
-#   ECS_HOST          ECS public IP or hostname
-#   ECS_USER          SSH login user (e.g. root)
-#   SSH_PRIVATE_KEY   Base64-encoded private key:  base64 -w0 ~/.ssh/id_rsa
-#
-# ── Staging secrets (master branch) ──────────────────────────────────────────
-#   STG_HUBSPOT_ACCESS_TOKEN
-#   STG_PG_HOST
-#   STG_PG_DB
-#   STG_PG_USER
-#   STG_PG_PASSWORD
-#   STG_ALLOWED_ORIGINS   e.g. http://YOUR_ECS_IP
-#
-# ── Production secrets (production branch) ────────────────────────────────────
-#   PRD_HUBSPOT_ACCESS_TOKEN
-#   PRD_PG_HOST
-#   PRD_PG_DB
-#   PRD_PG_USER
-#   PRD_PG_PASSWORD
-#   PRD_ALLOWED_ORIGINS   e.g. https://your-domain.com
-# ─────────────────────────────────────────────────────────────────────────────
+version: "2.0"
+parameters:
+  ### Common env
+  AWS_REGION: us-east-1
+  LAMBDA_FUNCTION_NAME: "lambda-image-updater"
+
+  ### API Server (backend)
+  DOCKERFILE_PATH: "./server/Dockerfile"
+  BUILD_CONTEXT: "./server"
+
+  ### Client (frontend)
+  DOCKERFILE_PATH_CLIENT: "./client/Dockerfile"
+  BUILD_CONTEXT_CLIENT: "./client"
+
+  # Staging environment
+  STG_CR_REPO_NAME: staging-sg-automation-ops-form
+  STG_CR_REGISTRY_HOST: epos-dev-docker-registry.ap-southeast-1.cr.aliyuncs.com
+  STG_CR_VPC_REGISTRY_HOST: epos-dev-docker-registry-vpc.ap-southeast-1.cr.aliyuncs.com
+  STG_CR_NAMESPACE: epos_staging
+  STG_K8S_NAMESPACE: data
+  STG_K8S_DEPLOYMENT_NAME: sg-automation-ops-form-api
+  STG_ENV: staging
+
+  STG_CR_REPO_NAME_CLIENT: staging-sg-automation-ops-form-client
+  STG_K8S_DEPLOYMENT_NAME_CLIENT: sg-automation-ops-form
+
+  # Production environment
+  PRD_CR_REPO_NAME: production-sg-automation-ops-form
+  PRD_CR_REGISTRY_HOST: 722152065486.dkr.ecr.us-east-1.amazonaws.com
+  PRD_CR_VPC_REGISTRY_HOST: 722152065486.dkr.ecr.us-east-1.amazonaws.com
+  PRD_CR_NAMESPACE: epos_production
+  PRD_K8S_NAMESPACE: production
+  PRD_K8S_DEPLOYMENT_NAME: production-sg-automation-ops-form
+  PRD_ENV: production
+
+  PRD_CR_REPO_NAME_CLIENT: production-sg-automation-ops-form-client
+  PRD_K8S_DEPLOYMENT_NAME_CLIENT: production-sg-automation-ops-form-client
 
 stages:
-  # ─── Prepare ───────────────────────────────────────────────────────────────
-  - stage: Prepare
-    jobs:
-      - job: prepare
-        steps:
-          - run: |
-              echo "IMAGE_TAG=${PIPELINE_ID:0:6}" >> env.properties
-              echo "REGISTRY=${ACR_REGISTRY}/${ACR_NAMESPACE}" >> env.properties
-        exportEnv: env.properties
+  - ecr-login
+  - prepare
+  - build
+  - deploy
 
-  # ─── Build ─────────────────────────────────────────────────────────────────
-  - stage: Build
-    dependsOn: Prepare
-    jobs:
-      - job: build_backend
-        steps:
-          - run: |
-              docker login -u ${ACR_USER} -p ${ACR_PASSWORD} ${ACR_REGISTRY}
-              docker build \
-                -t ${REGISTRY}/epos-referral-api:${IMAGE_TAG} \
-                ./server
-              docker push ${REGISTRY}/epos-referral-api:${IMAGE_TAG}
+jobs:
+  ecr-login:
+    id: ecr-login
+    stage: ecr-login
+    component: shell-with-clone
+    inputs:
+      image: reg.docker.alibaba-inc.com/alipay/7u2-common-custom:20260326
+      script: |
+        mkdir -p ~/.aws
+        cat > ~/.aws/credentials << EOF
+        [default]
+        aws_access_key_id = ${{secrets.AWS_ACCESS_KEY_ID}}
+        aws_secret_access_key = ${{secrets.AWS_SECRET_ACCESS_KEY}}
+        EOF
 
-      - job: build_frontend
-        steps:
-          - run: |
-              docker login -u ${ACR_USER} -p ${ACR_PASSWORD} ${ACR_REGISTRY}
-              docker build \
-                --build-arg VITE_API_URL="" \
-                -t ${REGISTRY}/epos-referral-client:${IMAGE_TAG} \
-                ./client
-              docker push ${REGISTRY}/epos-referral-client:${IMAGE_TAG}
+        cat > ~/.aws/config << EOF
+        [default]
+        region = ${{parameters.AWS_REGION}}
+        output = json
+        EOF
 
-  # ─── Deploy — Staging (master branch) ─────────────────────────────────────
-  - stage: Deploy_Staging
-    dependsOn: Build
-    trigger:
+        ECR_PASSWORD=$(aws ecr get-login-password --region ${{parameters.AWS_REGION}} --output text --no-cli-pager)
+        export ECR_PASSWORD
+        export ECR_REGISTRY="${{parameters.AWS_ECR_REGISTRY}}"
+        export ECR_USERNAME="AWS"
+      resourceClass: M
+      variables:
+        - ECR_PASSWORD
+        - ECR_USERNAME
+    only:
+      - production
+
+  generate-variable-staging:
+    id: generate-variable-staging
+    stage: prepare
+    component: shell-with-clone
+    inputs:
+      image: alipay/7u2-common:202403.0T-73654db
+      script: |
+        set -euo pipefail
+
+        export CR_REPO_NAME="${{parameters.STG_CR_REPO_NAME}}"
+        export REGISTRY_HOST="${{parameters.STG_CR_REGISTRY_HOST}}"
+        export CR_VPC_REGISTRY_HOST="${{parameters.STG_CR_VPC_REGISTRY_HOST}}"
+        export CR_NAMESPACE="${{parameters.STG_CR_NAMESPACE}}"
+        export K8S_NAMESPACE="${{parameters.STG_K8S_NAMESPACE}}"
+        export K8S_DEPLOYMENT_NAME="${{parameters.STG_K8S_DEPLOYMENT_NAME}}"
+        export ENV="${{parameters.STG_ENV}}"
+        export COMMIT_HASH="${{vcs.commitSha}}"
+
+        export CR_USERNAME="${{secrets.ACR_USERNAME}}"
+        export CR_PASSWORD="${{secrets.ACR_PASSWORD}}"
+        export K8S_KUBE_CONFIG="${{secrets.ACK_STAGING_KUBECONFIG}}"
+
+        export IMAGE_TAG="${COMMIT_HASH:0:6}"
+        export IMAGE_NAME="$REGISTRY_HOST/$CR_NAMESPACE/$CR_REPO_NAME"
+        export IMAGE_DEPLOYMENT="$CR_VPC_REGISTRY_HOST/$CR_NAMESPACE/$CR_REPO_NAME"
+
+        export IMAGE_NAME_CLIENT="$REGISTRY_HOST/$CR_NAMESPACE/${{parameters.STG_CR_REPO_NAME_CLIENT}}"
+        export IMAGE_DEPLOYMENT_CLIENT="$CR_VPC_REGISTRY_HOST/$CR_NAMESPACE/${{parameters.STG_CR_REPO_NAME_CLIENT}}"
+      resourceClass: M
+      variables:
+        - IMAGE_TAG
+        - IMAGE_NAME
+        - IMAGE_DEPLOYMENT
+        - CR_USERNAME
+        - CR_PASSWORD
+        - REGISTRY_HOST
+        - K8S_NAMESPACE
+        - K8S_DEPLOYMENT_NAME
+        - K8S_KUBE_CONFIG
+        - IMAGE_NAME_CLIENT
+        - IMAGE_DEPLOYMENT_CLIENT
+    only:
+      - feat/update-pipeline
+
+  generate-variable-production:
+    id: generate-variable-production
+    stage: prepare
+    component: shell-with-clone
+    inputs:
+      image: alipay/7u2-common:202403.0T-73654db
+      script: |
+        set -euo pipefail
+
+        export CR_REPO_NAME="${{parameters.PRD_CR_REPO_NAME}}"
+        export REGISTRY_HOST="${{parameters.PRD_CR_REGISTRY_HOST}}"
+        export CR_VPC_REGISTRY_HOST="${{parameters.PRD_CR_VPC_REGISTRY_HOST}}"
+        export CR_NAMESPACE="${{parameters.PRD_CR_NAMESPACE}}"
+        export K8S_NAMESPACE="${{parameters.PRD_K8S_NAMESPACE}}"
+        export K8S_DEPLOYMENT_NAME="${{parameters.PRD_K8S_DEPLOYMENT_NAME}}"
+        export ENV="${{parameters.PRD_ENV}}"
+        export COMMIT_HASH="${{vcs.commitSha}}"
+
+        export CR_USERNAME="${{jobs.ecr-login.outputs.variables.ECR_USERNAME}}"
+        export CR_PASSWORD="${{jobs.ecr-login.outputs.variables.ECR_PASSWORD}}"
+
+        export IMAGE_TAG="${COMMIT_HASH:0:6}"
+        export IMAGE_NAME="$REGISTRY_HOST/$CR_REPO_NAME"
+        export IMAGE_NAME_CLIENT="$REGISTRY_HOST/${{parameters.PRD_CR_REPO_NAME_CLIENT}}"
+        echo "Generated IMAGE_TAG=$IMAGE_TAG"
+        echo "$IMAGE_NAME $IMAGE_NAME_CLIENT $CR_USERNAME $CR_PASSWORD"
+      resourceClass: M
+      variables:
+        - IMAGE_TAG
+        - IMAGE_NAME
+        - CR_USERNAME
+        - CR_PASSWORD
+        - REGISTRY_HOST
+        - IMAGE_NAME_CLIENT
+    only:
+      - production
+    dependsOn: ecr-login
+
+  docker-build-staging:
+    stage: build
+    id: docker-build-staging
+    component: docker-image-build
+    inputs:
+      imageName: "${{jobs.generate-variable-staging.outputs.variables.IMAGE_NAME}}"
+      imageTag: "${{jobs.generate-variable-staging.outputs.variables.IMAGE_TAG}}"
+      dockerfile: "${{parameters.DOCKERFILE_PATH}}"
+      contextDir: "${{parameters.BUILD_CONTEXT}}"
+      registryUsername: "${{jobs.generate-variable-staging.outputs.variables.CR_USERNAME}}"
+      registryPassword: "${{jobs.generate-variable-staging.outputs.variables.CR_PASSWORD}}"
+      customRegistries: |
+        [
+          {
+            "registry": "${{jobs.generate-variable-staging.outputs.variables.REGISTRY_HOST}}",
+            "username": "${{jobs.generate-variable-staging.outputs.variables.CR_USERNAME}}",
+            "password": "${{jobs.generate-variable-staging.outputs.variables.CR_PASSWORD}}"
+          }
+        ]
+      cacheStrategy: "always"
+      compression: gzip
+      forceCompression: true
+      skipWhenImageExists: true
+    outputs:
+      image: ${{jobs.docker-build-staging.outputs.image}}
+      imageTag: ${{jobs.docker-build-staging.outputs.imageTag}}
+    only:
+      - feat/update-pipeline
+    dependsOn: generate-variable-staging
+
+  docker-build-staging-client:
+    stage: build
+    id: docker-build-staging-client
+    component: docker-image-build
+    inputs:
+      imageName: "${{jobs.generate-variable-staging.outputs.variables.IMAGE_NAME_CLIENT}}"
+      imageTag: "${{jobs.generate-variable-staging.outputs.variables.IMAGE_TAG}}"
+      dockerfile: "${{parameters.DOCKERFILE_PATH_CLIENT}}"
+      contextDir: "${{parameters.BUILD_CONTEXT_CLIENT}}"
+      registryUsername: "${{jobs.generate-variable-staging.outputs.variables.CR_USERNAME}}"
+      registryPassword: "${{jobs.generate-variable-staging.outputs.variables.CR_PASSWORD}}"
+      customRegistries: |
+        [
+          {
+            "registry": "${{jobs.generate-variable-staging.outputs.variables.REGISTRY_HOST}}",
+            "username": "${{jobs.generate-variable-staging.outputs.variables.CR_USERNAME}}",
+            "password": "${{jobs.generate-variable-staging.outputs.variables.CR_PASSWORD}}"
+          }
+        ]
+      cacheStrategy: "always"
+      compression: gzip
+      forceCompression: true
+      buildArgs: "VITE_API_URL=${{parameters.STG_VITE_API_URL}}"
+      skipWhenImageExists: true
+    outputs:
+      image: ${{jobs.docker-build-staging-client.outputs.image}}
+      imageTag: ${{jobs.docker-build-staging-client.outputs.imageTag}}
+    only:
+      - feat/update-pipeline
+    dependsOn: generate-variable-staging
+
+  docker-build-production:
+    stage: build
+    id: docker-build-production
+    component: docker-image-build
+    inputs:
+      imageName: "${{jobs.generate-variable-production.outputs.variables.IMAGE_NAME}}"
+      imageTag: "${{jobs.generate-variable-production.outputs.variables.IMAGE_TAG}}"
+      dockerfile: "${{parameters.DOCKERFILE_PATH}}"
+      contextDir: "${{parameters.BUILD_CONTEXT}}"
+      registryUsername: "${{jobs.generate-variable-production.outputs.variables.CR_USERNAME}}"
+      registryPassword: "${{jobs.generate-variable-production.outputs.variables.CR_PASSWORD}}"
+      customRegistries: |
+        [
+          {
+            "registry": "${{jobs.generate-variable-production.outputs.variables.REGISTRY_HOST}}",
+            "username": "${{jobs.generate-variable-production.outputs.variables.CR_USERNAME}}",
+            "password": "${{jobs.generate-variable-production.outputs.variables.CR_PASSWORD}}"
+          }
+        ]
+      cacheStrategy: "always"
+      compression: gzip
+      forceCompression: true
+      skipWhenImageExists: true
+    outputs:
+      image: ${{jobs.docker-build-production.outputs.image}}
+      imageTag: ${{jobs.docker-build-production.outputs.imageTag}}
+    only:
+      - production
+    dependsOn: generate-variable-production
+
+  docker-build-production-client:
+    stage: build
+    id: docker-build-production-client
+    component: docker-image-build
+    inputs:
+      imageName: "${{jobs.generate-variable-production.outputs.variables.IMAGE_NAME_CLIENT}}"
+      imageTag: "${{jobs.generate-variable-production.outputs.variables.IMAGE_TAG}}"
+      dockerfile: "${{parameters.DOCKERFILE_PATH_CLIENT}}"
+      contextDir: "${{parameters.BUILD_CONTEXT_CLIENT}}"
+      registryUsername: "${{jobs.generate-variable-production.outputs.variables.CR_USERNAME}}"
+      registryPassword: "${{jobs.generate-variable-production.outputs.variables.CR_PASSWORD}}"
+      customRegistries: |
+        [
+          {
+            "registry": "${{jobs.generate-variable-production.outputs.variables.REGISTRY_HOST}}",
+            "username": "${{jobs.generate-variable-production.outputs.variables.CR_USERNAME}}",
+            "password": "${{jobs.generate-variable-production.outputs.variables.CR_PASSWORD}}"
+          }
+        ]
+      cacheStrategy: "always"
+      compression: gzip
+      forceCompression: true
+      buildArgs: "VITE_API_URL=${{parameters.PRD_VITE_API_URL}}"
+      skipWhenImageExists: true
+    outputs:
+      image: ${{jobs.docker-build-production-client.outputs.image}}
+      imageTag: ${{jobs.docker-build-production-client.outputs.imageTag}}
+    only:
+      - production
+    dependsOn: generate-variable-production
+
+  k8s-deploy-staging:
+    id: k8s-deploy-staging
+    stage: deploy
+    component: shell-with-clone
+    inputs:
+      image: reg.docker.alibaba-inc.com/alipay/7u2-common-custom:20260326
+      script: |
+        set -euo pipefail
+
+        kubectl version --client || true
+
+        echo "=== 2) Write kubeconfig ==="
+        mkdir -p ~/.kube
+        echo "${{jobs.generate-variable-staging.outputs.variables.K8S_KUBE_CONFIG}}" | base64 -d > ~/.kube/config
+        chmod 600 ~/.kube/config
+        export KUBECONFIG=$HOME/.kube/config
+
+        head -n 5 ~/.kube/config
+        kubectl --kubeconfig ~/.kube/config config current-context
+
+        echo "=== 3) Deploy Server ==="
+        IMAGE="${{jobs.generate-variable-staging.outputs.variables.IMAGE_DEPLOYMENT}}:${{jobs.generate-variable-staging.outputs.variables.IMAGE_TAG}}"
+        echo "Deploy image: $IMAGE"
+        kubectl --kubeconfig ~/.kube/config -n ${{jobs.generate-variable-staging.outputs.variables.K8S_NAMESPACE}} set image deployment/${{jobs.generate-variable-staging.outputs.variables.K8S_DEPLOYMENT_NAME}} ${{jobs.generate-variable-staging.outputs.variables.K8S_DEPLOYMENT_NAME}}="$IMAGE"
+
+        echo "=== 4) Deploy Client ==="
+        IMAGE_CLIENT="${{jobs.generate-variable-staging.outputs.variables.IMAGE_DEPLOYMENT_CLIENT}}:${{jobs.generate-variable-staging.outputs.variables.IMAGE_TAG}}"
+        echo "Deploy client image: $IMAGE_CLIENT"
+        kubectl --kubeconfig ~/.kube/config -n ${{jobs.generate-variable-staging.outputs.variables.K8S_NAMESPACE}} set image deployment/${{parameters.STG_K8S_DEPLOYMENT_NAME_CLIENT}} ${{parameters.STG_K8S_DEPLOYMENT_NAME_CLIENT}}="$IMAGE_CLIENT"
+      resourceClass: M
+    only:
+      - feat/update-pipeline
+    dependsOn:
+      - docker-build-staging
+      - docker-build-staging-client
+
+  k8s-deploy-production:
+    id: k8s-deploy-production-trigger-lambda
+    stage: deploy
+    component: shell-with-clone
+    inputs:
+      image: reg.docker.alibaba-inc.com/alipay/7u2-common-custom:20260326
+      script: |
+        mkdir -p ~/.aws
+        cat > ~/.aws/credentials << EOF
+        [default]
+        aws_access_key_id = ${{secrets.AWS_ACCESS_KEY_ID}}
+        aws_secret_access_key = ${{secrets.AWS_SECRET_ACCESS_KEY}}
+        EOF
+        cat > ~/.aws/config << EOF
+        [default]
+        region = us-east-1
+        output = json
+        EOF
+        echo "AWS CLI configured successfully"
+        LAMBDA_FUNCTION_NAME="${{parameters.LAMBDA_FUNCTION_NAME}}"
+        PAYLOAD=$(cat <<EOF
+        {
+          "inputs": [
+            {
+              "image_tag": "${{jobs.docker-build-production.outputs.imageTag}}",
+              "path": "kustomization/${{parameters.PRD_ENV}}/sg-automation-ops-form/deployment.yaml",
+              "service_name": "production-sg-automation-ops-form"
+            },
+            {
+              "image_tag": "${{jobs.docker-build-production-client.outputs.imageTag}}",
+              "path": "kustomization/${{parameters.PRD_ENV}}/sg-automation-ops-form-client/deployment.yaml",
+              "service_name": "production-sg-automation-ops-form-client"
+            }
+          ]
+        }
+        EOF
+        )
+        echo "Payload prepared:"
+        echo "$PAYLOAD" | jq .
+        echo "Invoking Lambda function: $LAMBDA_FUNCTION_NAME"
+
+        aws lambda invoke \
+          --function-name "$LAMBDA_FUNCTION_NAME" \
+          --invocation-type "Event" \
+          --payload "$PAYLOAD" \
+          --cli-binary-format raw-in-base64-out /tmp/lambda-response.json --no-cli-pager
+        echo "Lambda trigger completed!"
+      resourceClass: M
+    only:
+      - production
+    dependsOn:
+      - docker-build-production
+      - docker-build-production-client
+
+triggers:
+  git:
+    push:
       branches:
-        include:
-          - master
-    jobs:
-      - job: deploy_staging
-        steps:
-          - run: |
-              mkdir -p ~/.ssh
-              echo "${SSH_PRIVATE_KEY}" | base64 -d > ~/.ssh/id_rsa
-              chmod 600 ~/.ssh/id_rsa
-
-              ssh -o StrictHostKeyChecking=no ${ECS_USER}@${ECS_HOST} << EOF
-                set -e
-                mkdir -p /app/epos-referral
-                cd /app/epos-referral
-
-                # Write .env from pipeline variables — no secrets in git
-                cat > .env << DOTENV
-HUBSPOT_ACCESS_TOKEN=${STG_HUBSPOT_ACCESS_TOKEN}
-PG_HOST=${STG_PG_HOST}
-PG_PORT=5432
-PG_DB=${STG_PG_DB}
-PG_USER=${STG_PG_USER}
-PG_PASSWORD=${STG_PG_PASSWORD}
-PG_SSL_MODE=require
-ALLOWED_ORIGINS=${STG_ALLOWED_ORIGINS}
-FRONTEND_PORT=80
-DOTENV
-                chmod 600 .env
-
-                docker login -u ${ACR_USER} -p ${ACR_PASSWORD} ${ACR_REGISTRY}
-
-                docker pull ${REGISTRY}/epos-referral-api:${IMAGE_TAG}
-                docker pull ${REGISTRY}/epos-referral-client:${IMAGE_TAG}
-
-                docker tag ${REGISTRY}/epos-referral-api:${IMAGE_TAG}    ${REGISTRY}/epos-referral-api:latest
-                docker tag ${REGISTRY}/epos-referral-client:${IMAGE_TAG} ${REGISTRY}/epos-referral-client:latest
-
-                docker compose up -d --no-build
-                docker image prune -f
-              EOF
-
-  # ─── Deploy — Production (production branch) ──────────────────────────────
-  - stage: Deploy_Production
-    dependsOn: Build
-    trigger:
-      branches:
-        include:
-          - production
-    jobs:
-      - job: deploy_production
-        steps:
-          - run: |
-              mkdir -p ~/.ssh
-              echo "${SSH_PRIVATE_KEY}" | base64 -d > ~/.ssh/id_rsa
-              chmod 600 ~/.ssh/id_rsa
-
-              ssh -o StrictHostKeyChecking=no ${ECS_USER}@${ECS_HOST} << EOF
-                set -e
-                mkdir -p /app/epos-referral
-                cd /app/epos-referral
-
-                # Write .env from pipeline variables — no secrets in git
-                cat > .env << DOTENV
-HUBSPOT_ACCESS_TOKEN=${PRD_HUBSPOT_ACCESS_TOKEN}
-PG_HOST=${PRD_PG_HOST}
-PG_PORT=5432
-PG_DB=${PRD_PG_DB}
-PG_USER=${PRD_PG_USER}
-PG_PASSWORD=${PRD_PG_PASSWORD}
-PG_SSL_MODE=require
-ALLOWED_ORIGINS=${PRD_ALLOWED_ORIGINS}
-FRONTEND_PORT=80
-DOTENV
-                chmod 600 .env
-
-                docker login -u ${ACR_USER} -p ${ACR_PASSWORD} ${ACR_REGISTRY}
-
-                docker pull ${REGISTRY}/epos-referral-api:${IMAGE_TAG}
-                docker pull ${REGISTRY}/epos-referral-client:${IMAGE_TAG}
-
-                docker tag ${REGISTRY}/epos-referral-api:${IMAGE_TAG}    ${REGISTRY}/epos-referral-api:latest
-                docker tag ${REGISTRY}/epos-referral-client:${IMAGE_TAG} ${REGISTRY}/epos-referral-client:latest
-
-                docker compose up -d --no-build
-                docker image prune -f
-              EOF
+        - feat/update-pipeline
+        - production
