@@ -116,7 +116,7 @@ jobs:
         - IMAGE_NAME_CLIENT
         - IMAGE_DEPLOYMENT_CLIENT
     only:
-      - feat/update-pipeline
+      - master
 
   generate-variable-production:
     id: generate-variable-production
@@ -183,7 +183,7 @@ jobs:
       image: ${{jobs.docker-build-staging.outputs.image}}
       imageTag: ${{jobs.docker-build-staging.outputs.imageTag}}
     only:
-      - feat/update-pipeline
+      - master
     dependsOn: generate-variable-staging
 
   docker-build-staging-client:
@@ -214,7 +214,7 @@ jobs:
       image: ${{jobs.docker-build-staging-client.outputs.image}}
       imageTag: ${{jobs.docker-build-staging-client.outputs.imageTag}}
     only:
-      - feat/update-pipeline
+      - master
     dependsOn: generate-variable-staging
 
   docker-build-production:
@@ -309,7 +309,7 @@ jobs:
         kubectl --kubeconfig ~/.kube/config -n ${{jobs.generate-variable-staging.outputs.variables.K8S_NAMESPACE}} set image deployment/${{parameters.STG_K8S_DEPLOYMENT_NAME_CLIENT}} ${{parameters.STG_K8S_DEPLOYMENT_NAME_CLIENT}}="$IMAGE_CLIENT"
       resourceClass: M
     only:
-      - feat/update-pipeline
+      - master
     dependsOn:
       - docker-build-staging
       - docker-build-staging-client
@@ -372,5 +372,5 @@ triggers:
   git:
     push:
       branches:
-        - feat/update-pipeline
+        - master
         - production
