@@ -1,31 +1,135 @@
-## README的意义
+# EPOS Referral System
 
-README 文件通常是项目的第一个入口点。你应该通过 README 明确地告诉大家，为什么他们应该使用你的项目，以及安装和使用的方法。
+A full-stack referral management system for the EPOS Sales Operations team. Sales reps (BDs) and internal teams submit referrals via web forms; the system persists submissions to PolarDB (PostgreSQL) and automatically creates linked Contact, Company and Deal records in HubSpot CRM.
 
-如果在仅仅看文档而不看代码的情况下就可以使用你的项目，该文档就完成了。 这个非常重要，因为这将使项目的文档接口与其内部实现分开，只要接口保持不变，就可以自由更改项目的内部结构。 
+---
 
-**文档，而不是代码定义了项目的使用方式。**
+## Repository Structure
 
-一个规范的README文档能减少用户检索信息的时间。
+```
+epos-referral/
+├── client/               # React frontend
+│   ├── App.jsx           # Main Referral Form (OWN, MERCHANT, BCRS)
+│   ├── InterTeamForm.jsx # Internal Referral Form (INTERNAL, MA)
+│   ├── shared.css        # Shared styling
+│   ├── main.jsx          # React entry point
+│   ├── public/           # Static assets (logo, favicon)
+│   ├── vite.config.js
+│   ├── nginx.conf        # Nginx config (serves SPA + proxies /api/ to backend)
+│   └── Dockerfile
+├── server/               # FastAPI backend
+│   ├── main.py           # API endpoints + PolarDB + HubSpot CRM
+│   ├── requirements.txt  # Python dependencies
+│   └── Dockerfile
+├── docker-compose.yml    # Full-stack orchestration (ECS deployment)
+├── .env                  # Secrets — never commit this
+├── .env.example          # Required variables reference
+└── README.md
+```
 
-## 标准 README
+---
 
-一个标准的README文件应当至少包含以下的内容：
+## Form Routes
 
-- 项目背景：说明创建本项目的背景与动机，创建本项目试图解决的问题 
-- 安装方法：说明如何快速上手使用该项目
-- 使用方法：列出本项目能够提供的功能以及使用这些功能的方法
-- 文档：现阶段antcode鼓励用户使用语雀组织项目文档，在README上应当放入项目的语雀文档链接
+| Path         | Form                                        |
+|--------------|---------------------------------------------|
+| `/`          | Main Referral Form (for Sales reps)         |
+| `/interteam` | Internal Referral Form (for internal/MA)    |
 
-## 附加内容
+---
 
-视项目的实际情况，同样也应该包含以下内容：
+## Tech Stack
 
-- 项目特性：说明本项目相较于其他同类项目所具有的特性
-- 兼容环境：说明本项目能够在什么平台上运行
-- 使用示例：展示一些使用本项目的小demo
-- 主要项目负责人：使用“@”标注出本项目的主要负责人，方便项目的用户沟通
-- 参与贡献的方式：规定好其他用户参与本项目并贡献代码的方式
-- 项目的参与者：列出项目主要的参与人
-- 已知用户：列出已经在生产环境中使用了本项目的全部或部分组件的公司或组织
-- 赞助者：列出为本项目提供赞助的用户
+**Frontend**
+- React 19 + Vite
+- Vanilla CSS (no UI library)
+- Served by Nginx inside Docker
+
+**Backend**
+- Python 3.12 + FastAPI
+- Uvicorn server (Docker)
+- Deployed on Alibaba Cloud ECS
+
+**Data Storage**
+- PolarDB PostgreSQL (Alibaba Cloud)
+- Local JSON fallback (ephemeral, container only)
+
+**Integrations**
+- HubSpot CRM API
+
+---
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and fill in your values:
+
+| Variable                | Description                                    |
+|-------------------------|------------------------------------------------|
+| `HUBSPOT_ACCESS_TOKEN`  | HubSpot Private App token                      |
+| `PG_HOST`               | PolarDB endpoint hostname                      |
+| `PG_PORT`               | PostgreSQL port (default: 5432)                |
+| `PG_DB`                 | Database name                                  |
+| `PG_USER`               | Database user                                  |
+| `PG_PASSWORD`           | Database password                              |
+| `PG_SSL_MODE`           | SSL mode (default: `require` for PolarDB)      |
+
+---
+
+## Local Development
+
+```bash
+# 1. Start the backend
+cd server
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+
+# 2. Start the frontend (separate terminal)
+cd client
+npm install
+npm run dev
+```
+
+Frontend: http://localhost:5173 — Vite proxies `/api/*` to the backend automatically.
+
+---
+
+## Deployment (Alibaba Cloud ECS)
+
+```bash
+# On your ECS instance
+git pull
+docker compose up --build -d
+
+# Check logs
+docker compose logs -f
+```
+
+Nginx (port 80) is publicly accessible. FastAPI (port 8000) is internal only — only reachable from Nginx inside the Docker network.
+
+---
+
+## Referral Types
+
+| Type      | Form              | Deal Stage             |
+|-----------|-------------------|------------------------|
+| OWN       | Main Referral     | Outbound Lead (For BDs)|
+| MERCHANT  | Main Referral     | Outbound Lead (For BDs)|
+| BCRS      | Main Referral     | Outbound Lead (For BDs)|
+| INTERNAL  | Internal Referral | New Inbound            |
+| MA        | Internal Referral | New Inbound            |
+
+---
+
+## API Endpoints
+
+| Method | Endpoint                   | Description                   |
+|--------|----------------------------|-------------------------------|
+| GET    | `/`                        | Health check                  |
+| POST   | `/api/referral`            | Submit main referral form     |
+| POST   | `/api/interteam-referral`  | Submit internal referral form |
+
+---
+
+## Owner
+
+Kalaivani, Business OPS Analyst EPOS
