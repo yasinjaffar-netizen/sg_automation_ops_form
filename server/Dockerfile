@@ -1,42 +1,40 @@
-# ────────────────────────────────────────────────────────────────
-# EPOS Referral — FastAPI Backend (Multi-stage build)
-# ────────────────────────────────────────────────────────────────
+# ─── Backend Dockerfile ───────────────────────────────────────────────────────## Stage 1: install all dependencies
+ARG REPO_PUBLIC=reg.docker.alibaba-inc.com/alipay/
+FROM ${REPO_PUBLIC}7u2-common-custom:python-3.12-slim.0406 AS deps
 
-# ─── Stage 1: compile dependencies ────────────────────────────
-FROM python:3.12-slim AS builder
+WORKDIR /install
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev gcc && \
+# Install system dependencies (libpq for PostgreSQL)
+RUN echo "deb https://mirrors.aliyun.com/debian/ trixie main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
+    echo "deb https://mirrors.aliyun.com/debian/ trixie-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
+    echo "deb https://mirrors.aliyun.com/debian-security/ trixie-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
+    rm -f /etc/apt/sources.list.d/*.sources && \
+    apt-get update && apt-get install -y --no-install-recommends libpq-dev gcc && \
     rm -rf /var/lib/apt/lists/*
 
+ENV PIP_INDEX_URL=http://mirrors.aliyun.com/pypi/simple/
+
 COPY requirements.txt .
+RUN pip install --no-cache-dir --trusted-host mirrors.aliyun.com -r requirements.txt
 
-# Use Alibaba mirror — significantly faster on ECS (Alibaba Cloud network)
-ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
-RUN pip install --no-cache-dir --user --trusted-host mirrors.aliyun.com -r requirements.txt
 
-# ─── Stage 2: lean runtime (no build tools) ───────────────────
-FROM python:3.12-slim
+# ─── Stage 2: runtime (inherits from deps — uvicorn already installed) ────────
+FROM deps AS runtime
 
 WORKDIR /app
 
-COPY --from=builder /root/.local /home/appuser/.local
+# Copy application source
 COPY . .
 
-RUN useradd -m -u 1001 appuser && chown -R appuser /app /home/appuser/.local
+# Non-root user for security
+RUN useradd -m -u 1001 appuser && chown -R appuser /app
 USER appuser
-ENV PATH=/home/appuser/.local/bin:$PATH
 
 EXPOSE 8000
 
-# Healthcheck hits /health (checks DB connectivity), not /
-HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
-
-# --proxy-headers + --forwarded-allow-ips: trust X-Forwarded-* from Nginx
 CMD ["uvicorn", "main:app", \
      "--host", "0.0.0.0", \
      "--port", "8000", \
      "--workers", "1", \
-     "--proxy-headers", \
-     "--forwarded-allow-ips", "*"]
+     "--forwarded-allow-ips", "*", \
+     "--proxy-headers"]
