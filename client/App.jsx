@@ -48,14 +48,14 @@ const initialFields = {
   first_name: "", last_name: "",
   country_code: "+65", phone: "",
   designation: "", pm: "",
-  products: "", products_other: "", additional_notes: "",
+  products: [], products_other: "", additional_notes: "",
 };
 
-// Required fields per referral type
+// Required fields per referral type (products validated separately)
 const REQUIRED = {
-  OWN:      ["company", "first_name", "phone", "pm", "products"],
-  BCRS:     ["company", "first_name", "phone", "pm", "products"],
-  MERCHANT: ["company_from", "company_ref", "first_name", "phone", "pm", "products"],
+  OWN:      ["company", "first_name", "phone", "pm"],
+  BCRS:     ["company", "first_name", "phone", "pm"],
+  MERCHANT: ["company_from", "company_ref", "first_name", "phone", "pm"],
 };
 
 const FIELD_LABELS = {
@@ -131,6 +131,36 @@ function PMDropdown({ value, onChange, error }) {
   );
 }
 
+function ProductsMultiSelect({ selected, onChange, error }) {
+  function toggle(value) {
+    const next = selected.includes(value)
+      ? selected.filter(v => v !== value)
+      : [...selected, value];
+    onChange(next);
+  }
+  return (
+    <div className={`products-multiselect${error ? " has-error" : ""}`}>
+      {PRODUCTS_OPTIONS.map(p => (
+        <button
+          key={p.value}
+          type="button"
+          className={`product-chip${selected.includes(p.value) ? " selected" : ""}`}
+          onClick={() => toggle(p.value)}
+        >
+          <span className="chip-check">
+            {selected.includes(p.value) && (
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <polyline points="1.5,5 4,7.5 8.5,2" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </span>
+          {p.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ThankYou({ onReset }) {
   return (
     <div className="form-card">
@@ -163,10 +193,9 @@ function ThankYou({ onReset }) {
   );
 }
 
-// Shared contact fields used by all referral types
-// startNum = the question number to begin counting from
-function ContactFields({ fields, errors, onChange, startNum }) {
+function ContactFields({ fields, errors, onChange, onProductsChange, startNum }) {
   const n = (i) => `${startNum + i}.`;
+  const hasOthers = fields.products.includes("OTHERS");
   return (
     <>
       <div className="two-col">
@@ -201,22 +230,14 @@ function ContactFields({ fields, errors, onChange, startNum }) {
       </FieldGroup>
 
       <FieldGroup label={`${n(4)} Products/Services Interested`} required error={errors.products}>
-        <div className="select-wrap">
-          <select
-            name="products"
-            value={fields.products}
-            onChange={onChange}
-            className={errors.products ? "has-error" : ""}
-          >
-            <option value="">Select a product/service</option>
-            {PRODUCTS_OPTIONS.map((p) => (
-              <option key={p.value} value={p.value}>{p.label}</option>
-            ))}
-          </select>
-        </div>
+        <ProductsMultiSelect
+          selected={fields.products}
+          onChange={onProductsChange}
+          error={errors.products}
+        />
       </FieldGroup>
 
-      {fields.products === "OTHERS" && (
+      {hasOthers && (
         <FieldGroup label={`${n(5)} Please specify`} required error={errors.products_other}>
           <PlainInput
             type="text" name="products_other" value={fields.products_other}
@@ -226,7 +247,7 @@ function ContactFields({ fields, errors, onChange, startNum }) {
         </FieldGroup>
       )}
 
-      <FieldGroup label={`${fields.products === "OTHERS" ? n(6) : n(5)} Additional Notes`}>
+      <FieldGroup label={`${hasOthers ? n(6) : n(5)} Additional Notes`}>
         <PlainInput
           type="text" name="additional_notes" value={fields.additional_notes}
           onChange={onChange}
@@ -235,7 +256,7 @@ function ContactFields({ fields, errors, onChange, startNum }) {
         />
       </FieldGroup>
 
-      <FieldGroup label={`${fields.products === "OTHERS" ? n(7) : n(6)} Project Manager`} required error={errors.pm}>
+      <FieldGroup label={`${hasOthers ? n(7) : n(6)} Project Manager`} required error={errors.pm}>
         <PMDropdown value={fields.pm} onChange={onChange} error={errors.pm} />
       </FieldGroup>
     </>
@@ -265,6 +286,11 @@ export default function App() {
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   }
 
+  function handleProductsChange(newSelected) {
+    setFields(prev => ({ ...prev, products: newSelected }));
+    if (errors.products) setErrors(prev => ({ ...prev, products: "" }));
+  }
+
   function validate() {
     if (!referralType) { setTypeError(true); return false; }
     const newErrors = {};
@@ -279,8 +305,11 @@ export default function App() {
     } else if (!/^[689]\d{7}$/.test(digits)) {
       newErrors.phone = "Please enter a valid 8-digit SG number starting with 6, 8 or 9.";
     }
-    // Products other validation
-    if (fields.products === "OTHERS" && !fields.products_other.trim()) {
+    // Products validation
+    if (fields.products.length === 0) {
+      newErrors.products = "Products/Services Interested is required.";
+    }
+    if (fields.products.includes("OTHERS") && !fields.products_other.trim()) {
       newErrors.products_other = "Please specify the product/service.";
     }
     setErrors(newErrors);
@@ -299,7 +328,9 @@ export default function App() {
       phone:           `${fields.country_code} ${fields.phone}`.trim(),
       designation:     fields.designation,
       project_manager: fields.pm,
-      products:        fields.products === "OTHERS" ? fields.products_other : fields.products,
+      products:        fields.products
+                         .map(p => p === "OTHERS" ? fields.products_other : p)
+                         .join(", "),
       additional_notes: fields.additional_notes,
       ...(referralType === "MERCHANT"
         ? { company_referred_from: fields.company_from, company_referral: fields.company_ref }
@@ -403,7 +434,9 @@ export default function App() {
                   </FieldGroup>
                   <ContactFields
                     fields={fields} errors={errors}
-                    onChange={handleChange} startNum={4}
+                    onChange={handleChange}
+                    onProductsChange={handleProductsChange}
+                    startNum={4}
                   />
                 </>
               )}
@@ -436,7 +469,9 @@ export default function App() {
                   </FieldGroup>
                   <ContactFields
                     fields={fields} errors={errors}
-                    onChange={handleChange} startNum={5}
+                    onChange={handleChange}
+                    onProductsChange={handleProductsChange}
+                    startNum={5}
                   />
                 </>
               )}
