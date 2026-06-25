@@ -3,9 +3,11 @@ import "./shared.css";
 
 const API_ENDPOINT = "/api/interteam-referral";
 
+const TO_MA_LINK = "https://alidocs.dingtalk.com/notable/share/form/v01Q35O851kN0RxJl9V_dv19yqvsgs3oebp3pcjys_1qX0QQ0?source=link";
+
 const SOURCE_MAP = {
   INTERNAL: "Internal Referral",
-  MA:       "MA Referral",
+  FROM_MA:  "MA Referral",
 };
 
 const COUNTRY_CODES = [
@@ -36,10 +38,10 @@ const PRODUCTS_OPTIONS = [
 const initialFields = {
   company_name: "", first_name: "", last_name: "",
   country_code: "+65", phone: "", designation: "", antding_staff_id: "",
-  products: "", products_other: "", additional_notes: "",
+  products: [], products_other: "", additional_notes: "",
 };
 
-const REQUIRED_FIELDS = ["company_name", "first_name", "phone", "antding_staff_id", "products"];
+const REQUIRED_FIELDS = ["company_name", "first_name", "phone", "antding_staff_id"];
 const FIELD_LABELS = {
   company_name:     "Company Name",
   first_name:       "First Name",
@@ -66,6 +68,36 @@ function FieldGroup({ label, sublabel, required, error, children }) {
 
 function PlainInput({ error, ...props }) {
   return <input className={error ? "has-error" : ""} {...props} />;
+}
+
+function ProductsMultiSelect({ selected, onChange, error }) {
+  function toggle(value) {
+    const next = selected.includes(value)
+      ? selected.filter(v => v !== value)
+      : [...selected, value];
+    onChange(next);
+  }
+  return (
+    <div className={`products-multiselect${error ? " has-error" : ""}`}>
+      {PRODUCTS_OPTIONS.map(p => (
+        <button
+          key={p.value}
+          type="button"
+          className={`product-chip${selected.includes(p.value) ? " selected" : ""}`}
+          onClick={() => toggle(p.value)}
+        >
+          <span className="chip-check">
+            {selected.includes(p.value) && (
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <polyline points="1.5,5 4,7.5 8.5,2" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </span>
+          {p.label}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function ThankYou({ onReset }) {
@@ -111,6 +143,10 @@ export default function InterTeamForm() {
   const [apiError, setApiError]         = useState("");
 
   function handleTypeSelect(type) {
+    if (type === "TO_MA") {
+      window.open(TO_MA_LINK, "_blank", "noopener,noreferrer");
+      return;
+    }
     setReferralType(type);
     setTypeError(false);
     setErrors({});
@@ -121,6 +157,11 @@ export default function InterTeamForm() {
     const { name, value } = e.target;
     setFields((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
+  }
+
+  function handleProductsChange(newSelected) {
+    setFields(prev => ({ ...prev, products: newSelected }));
+    if (errors.products) setErrors(prev => ({ ...prev, products: "" }));
   }
 
   function validate() {
@@ -137,8 +178,11 @@ export default function InterTeamForm() {
     } else if (!/^[689]\d{7}$/.test(digits)) {
       newErrors.phone = "Please enter a valid 8-digit SG number starting with 6, 8 or 9.";
     }
-    // Products other validation
-    if (fields.products === "OTHERS" && !fields.products_other.trim()) {
+    // Products validation
+    if (fields.products.length === 0) {
+      newErrors.products = "Products/Services Interested is required.";
+    }
+    if (fields.products.includes("OTHERS") && !fields.products_other.trim()) {
       newErrors.products_other = "Please specify the product/service.";
     }
     setErrors(newErrors);
@@ -157,7 +201,9 @@ export default function InterTeamForm() {
       phone:            `${fields.country_code} ${fields.phone}`.trim(),
       designation:      fields.designation,
       antding_staff_id: fields.antding_staff_id,
-      products:         fields.products === "OTHERS" ? fields.products_other : fields.products,
+      products:         fields.products
+                          .map(p => p === "OTHERS" ? fields.products_other : p)
+                          .join(", "),
       additional_notes: fields.additional_notes,
     };
     const backupKey = `interteam_backup_${Date.now()}`;
@@ -193,6 +239,8 @@ export default function InterTeamForm() {
 
   if (page === "thankyou") return <ThankYou onReset={handleReset} />;
 
+  const hasOthers = fields.products.includes("OTHERS");
+
   return (
     <div className="form-card">
       <div className="form-header">
@@ -209,16 +257,34 @@ export default function InterTeamForm() {
               1. What type of referral is this?<span className="req"> *</span>
             </div>
             <div className="type-buttons" style={{ display: "flex", gap: "8px" }}>
-              {["INTERNAL", "MA"].map((type) => (
+              {[
+                { key: "INTERNAL", label: "Internal" },
+                { key: "FROM_MA",  label: "From MA"  },
+                { key: "TO_MA",    label: "To MA"    },
+              ].map(({ key, label }) => (
                 <button
-                  key={type}
+                  key={key}
                   type="button"
-                  className={`type-btn${referralType === type ? " active" : ""}`}
-                  onClick={() => handleTypeSelect(type)}
+                  className={`type-btn${referralType === key ? " active" : ""}${key === "TO_MA" ? " type-btn-external" : ""}`}
+                  onClick={() => handleTypeSelect(key)}
                   style={{ flex: 1, justifyContent: "center" }}
                 >
-                  <span className="radio-ring"><span className="radio-dot" /></span>
-                  {type === "INTERNAL" ? "Internal" : "MA"}
+                  {key === "TO_MA" ? (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                        <polyline points="15 3 21 3 21 9" />
+                        <line x1="10" y1="14" x2="21" y2="3" />
+                      </svg>
+                      {label}
+                    </>
+                  ) : (
+                    <>
+                      <span className="radio-ring"><span className="radio-dot" /></span>
+                      {label}
+                    </>
+                  )}
                 </button>
               ))}
             </div>
@@ -254,7 +320,7 @@ export default function InterTeamForm() {
                 />
               </FieldGroup>
 
-              {/* Q3 & Q4 Name */}
+              {/* Q4 & Q5 Name */}
               <div className="two-col">
                 <FieldGroup label="4. First Name" required error={errors.first_name}>
                   <PlainInput
@@ -271,7 +337,7 @@ export default function InterTeamForm() {
                 </FieldGroup>
               </div>
 
-              {/* Q5 Phone */}
+              {/* Q6 Phone */}
               <FieldGroup label="6. Phone Number" required error={errors.phone}>
                 <div className="phone-wrap">
                   <select
@@ -293,7 +359,7 @@ export default function InterTeamForm() {
                 </div>
               </FieldGroup>
 
-              {/* Q6 Designation */}
+              {/* Q7 Designation */}
               <FieldGroup label="7. PIC 1 Designation">
                 <PlainInput
                   type="text" name="designation" value={fields.designation}
@@ -307,22 +373,14 @@ export default function InterTeamForm() {
                 required
                 error={errors.products}
               >
-                <div className="select-wrap">
-                  <select
-                    name="products"
-                    value={fields.products}
-                    onChange={handleChange}
-                    className={errors.products ? "has-error" : ""}
-                  >
-                    <option value="">Select a product/service</option>
-                    {PRODUCTS_OPTIONS.map((p) => (
-                      <option key={p.value} value={p.value}>{p.label}</option>
-                    ))}
-                  </select>
-                </div>
+                <ProductsMultiSelect
+                  selected={fields.products}
+                  onChange={handleProductsChange}
+                  error={errors.products}
+                />
               </FieldGroup>
 
-              {fields.products === "OTHERS" && (
+              {hasOthers && (
                 <FieldGroup label="9. Please specify" required error={errors.products_other}>
                   <PlainInput
                     type="text" name="products_other" value={fields.products_other}
@@ -332,7 +390,7 @@ export default function InterTeamForm() {
                 </FieldGroup>
               )}
 
-              <FieldGroup label={`${fields.products === "OTHERS" ? "10." : "9."} Additional Notes`}>
+              <FieldGroup label={`${hasOthers ? "10." : "9."} Additional Notes`}>
                 <PlainInput
                   type="text" name="additional_notes" value={fields.additional_notes}
                   onChange={handleChange}
@@ -343,7 +401,7 @@ export default function InterTeamForm() {
 
               {/* ANTDing Staff ID */}
               <FieldGroup
-                label={`${fields.products === "OTHERS" ? "11." : "10."} ANTDing Staff ID`}
+                label={`${hasOthers ? "11." : "10."} ANTDing Staff ID`}
                 required
                 error={errors.antding_staff_id}
                 sublabel="Find the Job ID via profile settings in the ANTDing app."

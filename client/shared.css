@@ -359,6 +359,79 @@ select.has-error {
   transform: translateY(-1px);
 }
 
+/* ── MULTI-SELECT PRODUCTS ──────────────────── */
+.products-multiselect {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.products-multiselect.has-error .product-chip {
+  border-color: #fca5a5;
+}
+
+.product-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.product-chip:hover {
+  border-color: var(--border-hover);
+  background: #ffffff;
+}
+
+.product-chip.selected {
+  border-color: var(--epos-blue);
+  background: var(--epos-blue-soft);
+  color: var(--epos-blue);
+  font-weight: 600;
+}
+
+.chip-check {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #fff;
+  transition: all var(--transition);
+}
+
+.product-chip.selected .chip-check {
+  background: var(--epos-blue);
+  border-color: var(--epos-blue);
+}
+
+/* ── TO MA EXTERNAL LINK BUTTON ─────────────── */
+.type-btn-external {
+  background: var(--epos-green);
+  color: #fff;
+}
+
+.type-btn-external:hover {
+  background: #38b84a;
+  box-shadow: 0 4px 14px rgba(74, 203, 90, 0.3);
+}
+
+.type-btn-external.active {
+  background: #38b84a;
+}
+
 /* ── ANIMATION ──────────────────────────────── */
 @keyframes fadeSlideIn {
   from { opacity: 0; transform: translateY(10px); }
