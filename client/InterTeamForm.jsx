@@ -201,9 +201,8 @@ export default function InterTeamForm() {
       phone:            `${fields.country_code} ${fields.phone}`.trim(),
       designation:      fields.designation,
       antding_staff_id: fields.antding_staff_id,
-      products:         fields.products
-                          .map(p => p === "OTHERS" ? fields.products_other : p)
-                          .join(", "),
+      products:         fields.products.join(", "),
+      products_other:   fields.products_other,
       additional_notes: fields.additional_notes,
     };
     const backupKey = `interteam_backup_${Date.now()}`;
