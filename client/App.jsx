@@ -328,9 +328,8 @@ export default function App() {
       phone:           `${fields.country_code} ${fields.phone}`.trim(),
       designation:     fields.designation,
       project_manager: fields.pm,
-      products:        fields.products
-                         .map(p => p === "OTHERS" ? fields.products_other : p)
-                         .join(", "),
+      products:        fields.products.join(", "),
+      products_other:  fields.products_other,
       additional_notes: fields.additional_notes,
       ...(referralType === "MERCHANT"
         ? { company_referred_from: fields.company_from, company_referral: fields.company_ref }

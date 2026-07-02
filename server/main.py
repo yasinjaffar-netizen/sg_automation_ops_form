@@ -190,6 +190,20 @@ def get_owner_id(pm_name: str) -> str:
 def build_deal_name(company_name: str, referral_type: str) -> str:
     return f"{title_case(company_name)} [{referral_type.upper()}]"
 
+def products_to_hs(products: str) -> str:
+    """Comma-separated enum tokens -> HubSpot ';'-separated enum value."""
+    items = [p.strip() for p in (products or "").split(",") if p.strip()]
+    return ";".join(items)
+
+def build_note_body(additional_notes: str, products_other: str) -> str:
+    """Combine additional notes with the free-text 'Others' product spec."""
+    parts = []
+    if additional_notes and additional_notes.strip():
+        parts.append(additional_notes.strip())
+    if products_other and products_other.strip():
+        parts.append(f"Others (Products/Services): {products_other.strip()}")
+    return "\n\n".join(parts)
+
 # ── HubSpot helpers ──────────────────────────────────────────
 
 def clean_phone(phone: str) -> str:
@@ -237,7 +251,7 @@ async def hs_create_contact(
                     "pic_1_designation": title_case(designation),
                     "source":            CONTACT_SOURCE_MAP.get(referral_type, ""),
                     "hubspot_owner_id":  owner_id,
-                    "productsservices":  products,
+                    "productsservices":  products_to_hs(products),
                 }
             }
         )
@@ -339,6 +353,7 @@ async def push_to_hubspot(
     pm_name: str = "",
     antding_staff_id: str = "",
     products: str = "",
+    products_other: str = "",
     additional_notes: str = "",
 ):
     if referral_type in ("OWN", "BCRS", "MERCHANT"):
@@ -360,22 +375,28 @@ async def push_to_hubspot(
 
     deal_name  = build_deal_name(company_name, referral_type)
 
-    contact_id = await hs_create_contact(
-        first_name, last_name, phone, designation, referral_type, contact_owner, products
-    )
-    company_id = await hs_create_company(
-        company_name, company_referred_from, company_owner
-    )
-    deal_id    = await hs_create_deal(
-        deal_name, referral_type, deal_owner, antding_staff_id
-    )
+    try:
+        contact_id = await hs_create_contact(
+            first_name, last_name, phone, designation, referral_type, contact_owner, products
+        )
+        company_id = await hs_create_company(
+            company_name, company_referred_from, company_owner
+        )
+        deal_id    = await hs_create_deal(
+            deal_name, referral_type, deal_owner, antding_staff_id
+        )
 
-    if additional_notes:
-        await hs_create_note(contact_id, additional_notes)
+        note_body = build_note_body(additional_notes, products_other)
+        if note_body:
+            await hs_create_note(contact_id, note_body)
 
-    await hs_associate(deal_id, "deals", contact_id, "contacts", 3)
-    await hs_associate(deal_id, "deals", company_id, "companies", 5)
-    await hs_associate(contact_id, "contacts", company_id, "companies", 1)
+        await hs_associate(deal_id, "deals", contact_id, "contacts", 3)
+        await hs_associate(deal_id, "deals", company_id, "companies", 5)
+        await hs_associate(contact_id, "contacts", company_id, "companies", 1)
+    except Exception as e:
+        # Runs inside a FastAPI BackgroundTask — exceptions would otherwise vanish.
+        print(f"[HubSpot] push failed ({referral_type}, {company_name!r}): {e}")
+        raise
 
     return {"contact_id": contact_id, "company_id": company_id, "deal_id": deal_id}
 
@@ -390,6 +411,7 @@ class InterTeamReferral(BaseModel):
     designation: str = ""
     antding_staff_id: str
     products: str = ""
+    products_other: str = ""
     additional_notes: str = ""
 
 class MainReferral(BaseModel):
@@ -404,6 +426,7 @@ class MainReferral(BaseModel):
     designation: str = ""
     project_manager: str
     products: str = ""
+    products_other: str = ""
     additional_notes: str = ""
 
 # ── Local JSON fallback (belt-and-suspenders, ephemeral) ──────
@@ -445,6 +468,7 @@ def health():
 @app.post("/api/referral")
 async def submit_referral(data: MainReferral, background_tasks: BackgroundTasks):
     payload = data.model_dump()
+    payload["additional_notes"] = build_note_body(data.additional_notes, data.products_other)
     save_submission({"submitted_at": now_sgt(), "form_type": "referral", "data": payload})
     db_save_referral(payload)
 
@@ -466,6 +490,7 @@ async def submit_referral(data: MainReferral, background_tasks: BackgroundTasks)
         referral_type         = data.referral_type,
         pm_name               = data.project_manager,
         products              = data.products,
+        products_other        = data.products_other,
         additional_notes      = data.additional_notes,
     )
 
@@ -475,6 +500,7 @@ async def submit_referral(data: MainReferral, background_tasks: BackgroundTasks)
 @app.post("/api/interteam-referral")
 async def submit_interteam_referral(data: InterTeamReferral, background_tasks: BackgroundTasks):
     payload = data.model_dump()
+    payload["additional_notes"] = build_note_body(data.additional_notes, data.products_other)
     save_submission({"submitted_at": now_sgt(), "form_type": "interteam", "data": payload})
     db_save_interteam(payload)
 
@@ -489,6 +515,7 @@ async def submit_interteam_referral(data: InterTeamReferral, background_tasks: B
         referral_type         = data.referral_type,
         antding_staff_id      = data.antding_staff_id,
         products              = data.products,
+        products_other        = data.products_other,
         additional_notes      = data.additional_notes,
     )
 
