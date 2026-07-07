@@ -165,6 +165,7 @@ PM_OWNER_MAP = {
 DEAL_SOURCE_MAP = {
     "INTERNAL": "Internal Referral",
     "MA":       "Internal Referral",
+    "FROM_MA":  "Internal Referral",
     "MERCHANT": "Merchant Referral",
     "OWN":      "BD (Outbound)",
     "BCRS":     "BD (Outbound)",
@@ -174,6 +175,7 @@ DEAL_SOURCE_MAP = {
 CONTACT_SOURCE_MAP = {
     "INTERNAL": "Internal Referral",
     "MA":       "Referral MA",
+    "FROM_MA":  "Referral MA",
     "MERCHANT": "Referral",
     "OWN":      "Sales' own Referral",
     "BCRS":     "Sales' own Referral",
@@ -287,7 +289,7 @@ async def hs_create_deal(
     owner_id: str,
     antding_staff_id: str = "",
 ) -> str:
-    stage_id = HS_STAGE_NEW_INBOUND if referral_type in ("INTERNAL", "MA") else HS_STAGE_OUTBOUND
+    stage_id = HS_STAGE_NEW_INBOUND if referral_type in ("INTERNAL", "MA", "FROM_MA") else HS_STAGE_OUTBOUND
     async with httpx.AsyncClient() as client:
         res = await client.post(
             f"{HUBSPOT_BASE}/crm/v3/objects/deals",
@@ -364,7 +366,7 @@ async def push_to_hubspot(
         contact_owner = HS_REINIE
         deal_owner    = HS_REINIE
         company_owner = HS_EMELINE
-    elif referral_type == "MA":
+    elif referral_type in ("MA", "FROM_MA"):
         contact_owner = HS_REINIE
         deal_owner    = HS_CASS
         company_owner = HS_EMELINE
@@ -470,7 +472,6 @@ async def submit_referral(data: MainReferral, background_tasks: BackgroundTasks)
     payload = data.model_dump()
     payload["additional_notes"] = build_note_body(data.additional_notes, data.products_other)
     save_submission({"submitted_at": now_sgt(), "form_type": "referral", "data": payload})
-    db_save_referral(payload)
 
     if data.referral_type == "MERCHANT":
         deal_company          = data.company_referral
@@ -479,6 +480,8 @@ async def submit_referral(data: MainReferral, background_tasks: BackgroundTasks)
         deal_company          = data.company_name
         company_referred_from = ""
 
+    # Run DB save in thread pool — avoids blocking the async event loop
+    background_tasks.add_task(db_save_referral, payload)
     background_tasks.add_task(
         push_to_hubspot,
         company_name          = deal_company,
@@ -502,8 +505,9 @@ async def submit_interteam_referral(data: InterTeamReferral, background_tasks: B
     payload = data.model_dump()
     payload["additional_notes"] = build_note_body(data.additional_notes, data.products_other)
     save_submission({"submitted_at": now_sgt(), "form_type": "interteam", "data": payload})
-    db_save_interteam(payload)
 
+    # Run DB save in thread pool — avoids blocking the async event loop
+    background_tasks.add_task(db_save_interteam, payload)
     background_tasks.add_task(
         push_to_hubspot,
         company_name          = data.company_name,
