@@ -1,53 +1,22 @@
-# ─────────────────────────────────────────────────────────────
-# EPOS Referral System — Docker Compose (ECS / Alibaba Cloud)
-# ─────────────────────────────────────────────────────────────
-# Services:
-#   frontend  — React (Nginx) on port 80, proxies /api/ to backend
-#   backend   — FastAPI (uvicorn) on internal port 8000 only
-#
-# Both join epos-net; backend is NOT exposed to the public internet.
-# Frontend only starts after backend passes its /health check.
-# ─────────────────────────────────────────────────────────────
 version: "3.9"
 
 services:
-  sg-automation-ops-form-api:
+  backend:
     build:
-      context: ./server
+      context: .
       dockerfile: Dockerfile
-    container_name: sg-automation-ops-form-api
+    container_name: epos_backend
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - ../.env
     environment:
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost}
-    expose:
-      - "8000"
-    healthcheck:
-      test: ["CMD", "python", "-c",
-             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-    networks:
-      - epos-net
-
-  sg-automation-ops-form:
-    build:
-      context: ./client
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: ""
-    container_name: sg-automation-ops-form
-    restart: unless-stopped
+      PG_HOST:                ${PG_HOST}
+      PG_PORT:                ${PG_PORT:-5432}
+      PG_DB:                  ${PG_DB}
+      PG_USER:                ${PG_USER}
+      PG_PASSWORD:            ${PG_PASSWORD}
+      PG_SSL_MODE:            ${PG_SSL_MODE:-require}
+      HUBSPOT_ACCESS_TOKEN:   ${HUBSPOT_ACCESS_TOKEN}
+      ALLOWED_ORIGINS:        ${ALLOWED_ORIGINS:-http://localhost:5173}
     ports:
-      - "${FRONTEND_PORT:-80}:80"
-    depends_on:
-      sg-automation-ops-form-api:
-        condition: service_healthy
-    networks:
-      - epos-net
-
-networks:
-  epos-net:
-    driver: bridge
+      - "8000:8000"

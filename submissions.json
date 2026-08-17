@@ -1,0 +1,172 @@
+[
+  {
+    "submitted_at": "2026-07-01 17:19:36",
+    "form_type": "interteam",
+    "data": {
+      "referral_type": "INTERNAL",
+      "source": "Internal Referral",
+      "company_name": "EPOS Pte Ltd @ Orchard",
+      "first_name": "Jane",
+      "last_name": "Tan",
+      "phone": "+65 91234567",
+      "designation": "Manager",
+      "antding_staff_id": "123456",
+      "products": "OTHERS",
+      "products_other": "Loyalty App",
+      "additional_notes": "call after 5pm\n\nOthers (Products/Services): Loyalty App"
+    }
+  },
+  {
+    "submitted_at": "2026-07-01 17:19:36",
+    "form_type": "interteam",
+    "data": {
+      "referral_type": "INTERNAL",
+      "source": "Internal Referral",
+      "company_name": "EPOS Pte Ltd @ Orchard",
+      "first_name": "Jane",
+      "last_name": "Tan",
+      "phone": "+65 91234567",
+      "designation": "Manager",
+      "antding_staff_id": "123456",
+      "products": "POS, OTHERS",
+      "products_other": "Loyalty App",
+      "additional_notes": "Others (Products/Services): Loyalty App"
+    }
+  },
+  {
+    "submitted_at": "2026-07-01 17:19:36",
+    "form_type": "interteam",
+    "data": {
+      "referral_type": "INTERNAL",
+      "source": "Internal Referral",
+      "company_name": "EPOS Pte Ltd @ Orchard",
+      "first_name": "Jane",
+      "last_name": "Tan",
+      "phone": "+65 91234567",
+      "designation": "Manager",
+      "antding_staff_id": "123456",
+      "products": "POS, WEBSITE",
+      "products_other": "",
+      "additional_notes": ""
+    }
+  },
+  {
+    "submitted_at": "2026-07-01 17:19:36",
+    "form_type": "interteam",
+    "data": {
+      "referral_type": "INTERNAL",
+      "source": "Internal Referral",
+      "company_name": "EPOS Pte Ltd @ Orchard",
+      "first_name": "Jane",
+      "last_name": "Tan",
+      "phone": "+65 91234567",
+      "designation": "Manager",
+      "antding_staff_id": "123456",
+      "products": "POS",
+      "products_other": "",
+      "additional_notes": ""
+    }
+  },
+  {
+    "submitted_at": "2026-07-01 17:19:36",
+    "form_type": "interteam",
+    "data": {
+      "referral_type": "INTERNAL",
+      "source": "Internal Referral",
+      "company_name": "EPOS Pte Ltd @ Orchard",
+      "first_name": "Jane",
+      "last_name": "Tan",
+      "phone": "+65 91234567",
+      "designation": "Manager",
+      "antding_staff_id": "123456",
+      "products": "POS",
+      "products_other": "",
+      "additional_notes": ""
+    }
+  },
+  {
+    "submitted_at": "2026-07-01 17:19:47",
+    "form_type": "interteam",
+    "data": {
+      "referral_type": "INTERNAL",
+      "source": "Internal Referral",
+      "company_name": "EPOS Pte Ltd @ Orchard",
+      "first_name": "Jane",
+      "last_name": "Tan",
+      "phone": "+65 91234567",
+      "designation": "Manager",
+      "antding_staff_id": "123456",
+      "products": "OTHERS",
+      "products_other": "Loyalty App",
+      "additional_notes": "call after 5pm\n\nOthers (Products/Services): Loyalty App"
+    }
+  },
+  {
+    "submitted_at": "2026-07-01 17:19:47",
+    "form_type": "interteam",
+    "data": {
+      "referral_type": "INTERNAL",
+      "source": "Internal Referral",
+      "company_name": "EPOS Pte Ltd @ Orchard",
+      "first_name": "Jane",
+      "last_name": "Tan",
+      "phone": "+65 91234567",
+      "designation": "Manager",
+      "antding_staff_id": "123456",
+      "products": "POS, OTHERS",
+      "products_other": "Loyalty App",
+      "additional_notes": "Others (Products/Services): Loyalty App"
+    }
+  },
+  {
+    "submitted_at": "2026-07-01 17:19:47",
+    "form_type": "interteam",
+    "data": {
+      "referral_type": "INTERNAL",
+      "source": "Internal Referral",
+      "company_name": "EPOS Pte Ltd @ Orchard",
+      "first_name": "Jane",
+      "last_name": "Tan",
+      "phone": "+65 91234567",
+      "designation": "Manager",
+      "antding_staff_id": "123456",
+      "products": "POS, WEBSITE",
+      "products_other": "",
+      "additional_notes": ""
+    }
+  },
+  {
+    "submitted_at": "2026-07-01 17:19:47",
+    "form_type": "interteam",
+    "data": {
+      "referral_type": "INTERNAL",
+      "source": "Internal Referral",
+      "company_name": "EPOS Pte Ltd @ Orchard",
+      "first_name": "Jane",
+      "last_name": "Tan",
+      "phone": "+65 91234567",
+      "designation": "Manager",
+      "antding_staff_id": "123456",
+      "products": "POS",
+      "products_other": "",
+      "additional_notes": ""
+    }
+  },
+  {
+    "submitted_at": "2026-07-01 17:19:47",
+    "form_type": "interteam",
+    "data": {
+      "referral_type": "INTERNAL",
+      "source": "Internal Referral",
+      "company_name": "EPOS Pte Ltd @ Orchard",
+      "first_name": "Jane",
+      "last_name": "Tan",
+      "phone": "+65 91234567",
+      "designation": "Manager",
+      "antding_staff_id": "123456",
+      "products": "POS",
+      "products_other": "",
+      "additional_notes": ""
+    }
+  }
+]
