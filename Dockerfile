@@ -1,40 +1,37 @@
-# ─── Backend Dockerfile ───────────────────────────────────────────────────────## Stage 1: install all dependencies
+# ─── Frontend Dockerfile ──────────────────────────────────────────────────────
+# Stage 1: build the React app
 ARG REPO_PUBLIC=reg.docker.alibaba-inc.com/alipay/
-FROM ${REPO_PUBLIC}7u2-common-custom:python-3.12-slim.0406 AS deps
-
-WORKDIR /install
-
-# Install system dependencies (libpq for PostgreSQL)
-RUN echo "deb https://mirrors.aliyun.com/debian/ trixie main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
-    echo "deb https://mirrors.aliyun.com/debian/ trixie-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
-    echo "deb https://mirrors.aliyun.com/debian-security/ trixie-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
-    rm -f /etc/apt/sources.list.d/*.sources && \
-    apt-get update && apt-get install -y --no-install-recommends libpq-dev gcc && \
-    rm -rf /var/lib/apt/lists/*
-
-ENV PIP_INDEX_URL=http://mirrors.aliyun.com/pypi/simple/
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir --trusted-host mirrors.aliyun.com -r requirements.txt
-
-
-# ─── Stage 2: runtime (inherits from deps — uvicorn already installed) ────────
-FROM deps AS runtime
+FROM ${REPO_PUBLIC}7u2-common-custom:node-20-slim.0406 AS builder
 
 WORKDIR /app
 
-# Copy application source
+# Install dependencies first (cached layer if package files unchanged)
+COPY package.json package-lock.json ./
+RUN npm config set registry https://registry.npmmirror.com
+RUN npm ci --prefer-offline
+
 COPY . .
 
-# Non-root user for security
-RUN useradd -m -u 1001 appuser && chown -R appuser /app
-USER appuser
+# VITE_API_URL="" → all fetch() calls use relative paths (e.g. /leads, /auth/…)
+# Nginx then proxies those paths to the backend container.
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
 
-EXPOSE 8000
+RUN npm run build
 
-CMD ["uvicorn", "main:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8000", \
-     "--workers", "1", \
-     "--forwarded-allow-ips", "*", \
-     "--proxy-headers"]
+
+# ─── Stage 2: serve with Nginx ────────────────────────────────────────────────
+FROM ${REPO_PUBLIC}7u2-common-custom:nginx-1.27-alpine.0406 AS runtime
+
+# Remove the default Nginx welcome page
+RUN rm -rf /usr/share/nginx/html/*
+
+# Copy built React app
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Custom Nginx config (SPA routing + API proxy)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
