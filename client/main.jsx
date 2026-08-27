@@ -5,7 +5,8 @@ import InterTeamForm from './InterTeamForm.jsx'
 import JobsheetForm from './JobsheetForm.jsx'
 import HomePage from './HomePage.jsx'
 
-const path = window.location.pathname.replace(/\/+$/, '') || '/'
+// tolerate a trailing slash or stray dot ("/home." -> "/home")
+const path = window.location.pathname.toLowerCase().replace(/[/.]+$/, '') || '/'
 
 const routes = {
   '/home': <HomePage />,
