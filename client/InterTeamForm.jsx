@@ -7,7 +7,7 @@ const TO_MA_LINK = "https://alidocs.dingtalk.com/notable/share/form/v01Q35O851kN
 
 const SOURCE_MAP = {
   INTERNAL: "Internal Referral",
-  FROM_MA:  "MA Referral",
+  FROM_MA:  "EPOS360 - BDOB",
 };
 
 const COUNTRY_CODES = [

@@ -164,8 +164,8 @@ PM_OWNER_MAP = {
 # ── Deal source mapping ──────────────────────────────────────
 DEAL_SOURCE_MAP = {
     "INTERNAL": "Internal Referral",
-    "MA":       "Internal Referral",
-    "FROM_MA":  "Internal Referral",
+    "MA":       "EPOS360 - BDOB",
+    "FROM_MA":  "EPOS360 - BDOB",
     "MERCHANT": "Merchant Referral",
     "OWN":      "BD (Outbound)",
     "BCRS":     "BD (Outbound)",
@@ -174,8 +174,8 @@ DEAL_SOURCE_MAP = {
 # ── Contact source mapping ───────────────────────────────────
 CONTACT_SOURCE_MAP = {
     "INTERNAL": "Internal Referral",
-    "MA":       "Referral MA",
-    "FROM_MA":  "Referral MA",
+    "MA":       "EPOS360 - BDOB",
+    "FROM_MA":  "EPOS360 - BDOB",
     "MERCHANT": "Referral",
     "OWN":      "Sales' own Referral",
     "BCRS":     "Sales' own Referral",
@@ -290,20 +290,22 @@ async def hs_create_deal(
     antding_staff_id: str = "",
 ) -> str:
     stage_id = HS_STAGE_NEW_INBOUND if referral_type in ("INTERNAL", "MA", "FROM_MA") else HS_STAGE_OUTBOUND
+    deal_props = {
+        "dealname":         deal_name,
+        "pipeline":         HS_PIPELINE_ID,
+        "dealstage":        stage_id,
+        "deal_source":      DEAL_SOURCE_MAP.get(referral_type, ""),
+        "hubspot_owner_id": owner_id,
+        "antding_job_id":   antding_staff_id,
+    }
+    # "From MA" referrals are tagged with Origin Pipeline = MA on the Deal
+    if referral_type in ("MA", "FROM_MA"):
+        deal_props["origin_pipeline"] = "MA"
     async with httpx.AsyncClient() as client:
         res = await client.post(
             f"{HUBSPOT_BASE}/crm/v3/objects/deals",
             headers=HS_HEADERS,
-            json={
-                "properties": {
-                    "dealname":         deal_name,
-                    "pipeline":         HS_PIPELINE_ID,
-                    "dealstage":        stage_id,
-                    "deal_source":      DEAL_SOURCE_MAP.get(referral_type, ""),
-                    "hubspot_owner_id": owner_id,
-                    "antding_job_id":   antding_staff_id,
-                }
-            }
+            json={"properties": deal_props},
         )
         if not res.is_success:
             raise Exception(f"HubSpot deal error {res.status_code}: {res.text}")
