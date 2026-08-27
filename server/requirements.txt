@@ -16,3 +16,9 @@ typing-inspection==0.4.2
 typing_extensions==4.15.0
 urllib3==2.7.0
 uvicorn==0.46.0
+
+# ── Jobsheet form (server/jobsheet.py) — PDF generation for the jobsheet ──────
+fpdf2==2.8.2
+Pillow==10.4.0
+fonttools==4.53.1
+defusedxml==0.7.1

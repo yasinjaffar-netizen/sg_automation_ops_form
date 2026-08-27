@@ -1,0 +1,14 @@
+# Local testing only — public base image.
+# The production server/Dockerfile uses Alibaba-internal base images
+# (reg.docker.alibaba-inc.com/...) that can't be pulled outside the corp network.
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -124,6 +124,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Jobsheet form (served at /jobsheet; endpoints /api/search-deal,
+#    /api/deal-details/{id}, /api/jobsheet). Creates HubSpot Tickets using its
+#    own HUBSPOT_JOBSHEET_TOKEN — see server/jobsheet.py. ──────────────────────
+from jobsheet import router as jobsheet_router  # noqa: E402
+app.include_router(jobsheet_router)
+
 # ── HubSpot setup ────────────────────────────────────────────
 HUBSPOT_TOKEN  = os.environ.get("HUBSPOT_ACCESS_TOKEN")
 HUBSPOT_BASE   = "https://api.hubapi.com"

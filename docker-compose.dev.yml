@@ -1,0 +1,41 @@
+# ─────────────────────────────────────────────────────────────
+# LOCAL TESTING ONLY — public base images, no PolarDB required.
+#   docker compose -f docker-compose.dev.yml up --build
+#   → frontend  http://localhost:8080  (form at /jobsheet)
+#   → backend   http://localhost:8000  (proxied via nginx as /api/)
+#
+# Production deploy uses docker-compose.yml via the .aci.yml pipeline.
+# ─────────────────────────────────────────────────────────────
+services:
+  sg-automation-ops-form-api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    container_name: sg-automation-ops-form-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ALLOWED_ORIGINS: http://localhost:8080
+    ports:
+      - "8000:8000"
+    networks:
+      - epos-net
+
+  sg-automation-ops-form:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+      args:
+        VITE_API_URL: ""
+    container_name: sg-automation-ops-form
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - sg-automation-ops-form-api
+    networks:
+      - epos-net
+
+networks:
+  epos-net:
+    driver: bridge

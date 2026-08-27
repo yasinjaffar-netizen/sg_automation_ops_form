@@ -1,5 +1,6 @@
 service_account.json
 .env
 submissions.json
+jobsheets.json
 __pycache__/
 *.pyc

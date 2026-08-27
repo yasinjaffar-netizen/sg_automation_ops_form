@@ -1,0 +1,823 @@
+/* Jobsheet form styles — every rule scoped under .jobsheet-root so it cannot
+   collide with shared.css (the referral form). The jobsheet form lives at the
+   /jobsheet route; App.jsx / InterTeamForm.jsx are unaffected. */
+
+/* On the /jobsheet route only, undo shared.css's <body> layout (flex-centered
+   with 48px/80px padding, DM Sans, --bg) — the jobsheet page manages its own
+   full-bleed layout and background via .jobsheet-root / .page. */
+body:has(.jobsheet-root) {
+  display: block;
+  padding: 0;
+  background: transparent;
+}
+
+.jobsheet-root {
+  --navy: #182a6e;
+  --navy-light: #2c3f8f;
+  --green: #3fae49;
+  --green-light: #eaf7ec;
+  --border: #e2e5ec;
+  --text: #1f2430;
+  --muted: #6b7280;
+
+  min-height: 100vh;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: linear-gradient(180deg, #f4f6fb 0%, #eceff8 100%);
+  color: var(--text);
+}
+
+.jobsheet-root,
+.jobsheet-root *,
+.jobsheet-root *::before,
+.jobsheet-root *::after {
+  box-sizing: border-box;
+}
+
+.jobsheet-root .page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 16px 56px;
+}
+
+.jobsheet-root .topbar {
+  width: 100%;
+  max-width: 760px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 4px 22px;
+}
+
+.jobsheet-root .brand-logo {
+  height: 88px;
+  width: auto;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 18px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.jobsheet-root .brand-divider {
+  width: 1px;
+  height: 52px;
+  background: var(--border);
+}
+
+.jobsheet-root .brand-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.3;
+}
+
+.jobsheet-root .brand-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--navy);
+  letter-spacing: -0.01em;
+}
+
+.jobsheet-root .brand-subtitle {
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.jobsheet-root .card {
+  width: 100%;
+  max-width: 760px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 36px 40px 40px;
+  box-shadow: 0 12px 32px rgba(24, 42, 110, 0.08), 0 1px 2px rgba(24, 42, 110, 0.04);
+  border: 1px solid rgba(24, 42, 110, 0.05);
+}
+
+.jobsheet-root .subtitle {
+  margin: 0 0 28px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.jobsheet-root fieldset {
+  border: none;
+  padding: 0;
+  margin: 0 0 30px;
+}
+
+.jobsheet-root fieldset:not(:first-of-type) {
+  border-top: 1px solid var(--border);
+  padding-top: 26px;
+}
+
+.jobsheet-root legend {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--navy);
+  margin-bottom: 16px;
+  padding: 0;
+}
+
+.jobsheet-root .step-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.jobsheet-root .grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.jobsheet-root .field-group {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.jobsheet-root .field-group:has(.option-grid) {
+  margin-bottom: 22px;
+}
+
+.jobsheet-root .field-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.jobsheet-root .required {
+  color: #dc2626;
+  margin-left: 2px;
+}
+
+.jobsheet-root .field-error {
+  font-size: 12px;
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.jobsheet-root input,
+.jobsheet-root select,
+.jobsheet-root textarea {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  width: 100%;
+  background: #fff;
+  color: var(--text);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.jobsheet-root input:focus,
+.jobsheet-root select:focus,
+.jobsheet-root textarea:focus {
+  outline: none;
+  border-color: var(--navy-light);
+  box-shadow: 0 0 0 3px rgba(24, 42, 110, 0.12);
+}
+
+.jobsheet-root input[readOnly] {
+  background: #f3f4f6;
+  color: #4b5563;
+  cursor: not-allowed;
+}
+
+.jobsheet-root .search-box {
+  position: relative;
+}
+
+.jobsheet-root .dropdown {
+  position: relative;
+}
+
+.jobsheet-root .dropdown-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.jobsheet-root .dropdown-trigger:hover {
+  border-color: var(--navy-light);
+}
+
+.jobsheet-root .dropdown-trigger.open {
+  border-color: var(--navy-light);
+  box-shadow: 0 0 0 3px rgba(24, 42, 110, 0.12);
+}
+
+.jobsheet-root .dropdown-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jobsheet-root .dropdown-placeholder {
+  color: #9ca3af;
+}
+
+.jobsheet-root .dropdown-chevron {
+  flex-shrink: 0;
+  color: var(--navy-light);
+  transition: transform 0.15s;
+}
+
+.jobsheet-root .dropdown-trigger.open .dropdown-chevron {
+  transform: rotate(180deg);
+}
+
+.jobsheet-root .dropdown-list {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  margin-top: 6px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(24, 42, 110, 0.15);
+  list-style: none;
+  padding: 5px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.jobsheet-root .dropdown-option {
+  padding: 9px 11px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.jobsheet-root .dropdown-option:hover {
+  background: var(--green-light);
+}
+
+.jobsheet-root .dropdown-option.selected {
+  background: var(--navy);
+  color: #fff;
+  font-weight: 600;
+}
+
+.jobsheet-root .hint {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.jobsheet-root .suggestions {
+  position: absolute;
+  z-index: 10;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(24, 42, 110, 0.12);
+  list-style: none;
+  padding: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.jobsheet-root .suggestions li {
+  padding: 9px 11px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.jobsheet-root .suggestions li:hover {
+  background: var(--green-light);
+}
+
+.jobsheet-root .suggestions .stage {
+  color: #9ca3af;
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.jobsheet-root .suggestions li.suggestions-manual-entry {
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--navy-light);
+  font-weight: 600;
+}
+
+.jobsheet-root .suggestions-manual-entry:hover {
+  background: var(--green-light);
+}
+
+.jobsheet-root .no-match {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.jobsheet-root .link-btn {
+  background: none;
+  border: none;
+  color: var(--navy-light);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+  text-decoration: underline;
+  width: auto;
+  font-weight: 600;
+}
+
+.jobsheet-root .locked-block {
+  border: 1px solid #c9ecce;
+  background: var(--green-light);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.jobsheet-root .locked-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f7a2c;
+  margin-bottom: 12px;
+}
+
+.jobsheet-root .locked-header .link-btn {
+  margin-left: auto;
+  color: #1f7a2c;
+}
+
+.jobsheet-root .option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.jobsheet-root .option-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 9px;
+  padding: 10px 13px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  line-height: 1.35;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.jobsheet-root .option-tile:hover {
+  border-color: var(--green);
+}
+
+.jobsheet-root .option-tile.selected {
+  border-color: var(--navy);
+  background: var(--green-light);
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.jobsheet-root .option-check {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid #c7cbd6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: #fff;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.jobsheet-root .option-tile.selected .option-check {
+  background: var(--green);
+  border-color: var(--navy);
+}
+
+.jobsheet-root .option-label {
+  overflow-wrap: anywhere;
+}
+
+.jobsheet-root .datepicker-panel {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  margin-top: 6px;
+  width: 280px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(24, 42, 110, 0.15);
+  padding: 14px;
+}
+
+.jobsheet-root .datepicker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.jobsheet-root .datepicker-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.jobsheet-root .datepicker-nav {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--navy);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.jobsheet-root .datepicker-nav:hover {
+  border-color: var(--navy-light);
+  background: var(--green-light);
+}
+
+.jobsheet-root .datepicker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.jobsheet-root .datepicker-weekdays {
+  margin-bottom: 4px;
+}
+
+.jobsheet-root .datepicker-weekdays span {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 4px 0;
+}
+
+.jobsheet-root .datepicker-day {
+  border: none;
+  background: none;
+  border-radius: 7px;
+  padding: 7px 0;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.jobsheet-root .datepicker-day:hover {
+  background: var(--green-light);
+}
+
+.jobsheet-root .datepicker-day.today {
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.jobsheet-root .datepicker-day.selected {
+  background: var(--navy);
+  color: #fff;
+  font-weight: 700;
+}
+
+.jobsheet-root .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.jobsheet-root .logo-upload-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  padding: 22px 12px;
+  border: 1.5px dashed var(--border);
+  border-radius: 10px;
+  background: #fafbfd;
+  color: var(--navy-light);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.jobsheet-root .logo-upload-btn:hover {
+  border-color: var(--green);
+  background: var(--green-light);
+}
+
+.jobsheet-root .logo-upload-btn span:nth-of-type(1) {
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.jobsheet-root .logo-upload-hint {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.jobsheet-root .logo-upload-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fafbfd;
+}
+
+.jobsheet-root .logo-upload-preview img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+.jobsheet-root .logo-upload-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.jobsheet-root .logo-upload-filename {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jobsheet-root .logo-upload-actions {
+  display: flex;
+  gap: 14px;
+}
+
+.jobsheet-root .logo-remove {
+  color: #dc2626;
+}
+
+.jobsheet-root .datepicker-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.jobsheet-root .specify {
+  margin-top: 8px;
+}
+
+.jobsheet-root .draft-banner {
+  background: #eef1fb;
+  color: var(--navy);
+  border: 1px solid #cdd4f2;
+}
+
+.jobsheet-root .secondary-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  margin-bottom: 10px;
+}
+
+.jobsheet-root .btn-outline {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--navy);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.jobsheet-root .btn-outline:hover {
+  border-color: var(--navy-light);
+  background: var(--green-light);
+}
+
+.jobsheet-root .btn-outline.btn-danger {
+  color: #b42318;
+}
+
+.jobsheet-root .btn-outline.btn-danger:hover {
+  border-color: #f2b8b5;
+  background: #fef2f2;
+}
+
+.jobsheet-root .submit-btn {
+  width: 100%;
+  padding: 14px;
+  margin-top: 6px;
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(24, 42, 110, 0.25);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.jobsheet-root .submit-btn:hover:not(:disabled) {
+  box-shadow: 0 8px 20px rgba(24, 42, 110, 0.3);
+  transform: translateY(-1px);
+}
+
+.jobsheet-root .submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.jobsheet-root .banner {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.jobsheet-root .banner.ok {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.jobsheet-root .banner.error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.jobsheet-root .banner ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.jobsheet-root .subsection {
+  border-left: 3px solid var(--green);
+  background: #fafdfb;
+  border-radius: 0 10px 10px 0;
+  padding: 14px 16px;
+  margin: 10px 0 18px;
+}
+
+.jobsheet-root .subsection .subsection {
+  margin: 10px 0 0;
+}
+
+.jobsheet-root .address-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.jobsheet-root .address-card {
+  border: 1px solid var(--border);
+  background: #f8f9fc;
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.jobsheet-root .address-card-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--navy);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.jobsheet-root .address-card-value {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.jobsheet-root .same-address-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy-light);
+  cursor: pointer;
+}
+
+.jobsheet-root .address-card .same-address-check {
+  margin: 8px 0 0;
+}
+
+.jobsheet-root .same-address-check input:disabled {
+  cursor: not-allowed;
+}
+
+.jobsheet-root .address-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.jobsheet-root .address-fields .field-group {
+  margin-bottom: 0;
+}
+
+.jobsheet-root .hardware-block {
+  border-left-color: var(--navy-light);
+  background: #f7f8fc;
+}
+
+.jobsheet-root .hardware-block .hint {
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+
+.jobsheet-root input[type="checkbox"] {
+  width: auto;
+}
+
+.jobsheet-root input[type="file"] {
+  padding: 6px 0;
+  border: none;
+}
+
+@media (max-width: 480px) {
+  .jobsheet-root .card {
+    padding: 26px 20px 30px;
+  }
+
+  .jobsheet-root .grid,
+  .jobsheet-root .address-compare,
+  .jobsheet-root .option-grid {
+    grid-template-columns: 1fr;
+  }
+}
