@@ -789,6 +789,61 @@ body:has(.jobsheet-root) {
   margin-bottom: 0;
 }
 
+.jobsheet-root .address-source-picker {
+  gap: 4px;
+}
+
+.jobsheet-root .address-source-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.jobsheet-root .address-source-option:hover {
+  background: rgba(24, 42, 110, 0.04);
+}
+
+.jobsheet-root .address-source-option input[type="radio"] {
+  margin-top: 2px;
+  accent-color: var(--navy);
+}
+
+.jobsheet-root .address-source-option input[type="radio"]:focus-visible {
+  outline: 2px solid var(--navy-light);
+  outline-offset: 2px;
+}
+
+.jobsheet-root .address-source-option input:disabled {
+  cursor: not-allowed;
+}
+
+.jobsheet-root .address-source-option > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.jobsheet-root .address-source-option strong {
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.jobsheet-root .address-source-detail {
+  color: var(--navy-light);
+}
+
+.jobsheet-root .address-source-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b45309;
+}
+
 .jobsheet-root .hardware-block {
   border-left-color: var(--navy-light);
   background: #f7f8fc;
@@ -801,8 +856,15 @@ body:has(.jobsheet-root) {
   font-size: 13px;
 }
 
-.jobsheet-root input[type="checkbox"] {
+.jobsheet-root input[type="checkbox"],
+.jobsheet-root input[type="radio"] {
   width: auto;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  flex: none;
 }
 
 .jobsheet-root input[type="file"] {

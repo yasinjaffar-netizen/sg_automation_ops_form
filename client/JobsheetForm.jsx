@@ -50,6 +50,20 @@ function formatSgPhone(raw) {
   return part2 ? `+65 ${digits.slice(0, 4)} ${part2}` : `+65 ${digits}`;
 }
 
+// Given a chosen deployment-address option, returns the form-state patch:
+// the three deployment_* fields plus the source marker. "manual" only sets the
+// marker so the user's own typing is left untouched.
+function pickAddressPatch(addr) {
+  const source = addr?.source || "";
+  if (source === "manual") return { deployment_address_source: "manual" };
+  return {
+    deployment_address_source: source,
+    deployment_unit: addr?.unit || "",
+    deployment_blk_st: addr?.blk_st || "",
+    deployment_postal_code: String(addr?.postal_code || ""),
+  };
+}
+
 const emptyForm = {
   // Deal / company / contact
   deal_id: null,
@@ -68,7 +82,9 @@ const emptyForm = {
   registered_unit: "",
   registered_blk_st: "",
   registered_postal_code: "",
-  same_as_registered: false,
+  operational_addresses: [], // [{ index, unit, blk_st, postal_code }] from the Deal
+  number_of_outlets_sold: "",
+  deployment_address_source: "", // "" | "manual" | "registered" | "operational-<index>"
   deployment_unit: "",
   deployment_blk_st: "",
   deployment_postal_code: "",
@@ -192,6 +208,41 @@ export default function JobsheetForm() {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
+  // Typing directly into a deployment address field means the value no longer
+  // matches whichever HubSpot address was picked - flip the source to "manual"
+  // so the picker stops highlighting a stale option.
+  function setDeploymentField(key, value) {
+    setForm((f) => ({ ...f, [key]: value, deployment_address_source: "manual" }));
+  }
+
+  function handlePickAddress(source) {
+    setForm((f) => {
+      if (source === "manual") {
+        return {
+          ...f,
+          deployment_address_source: "manual",
+          deployment_unit: "",
+          deployment_blk_st: "",
+          deployment_postal_code: "",
+        };
+      }
+      if (source === "registered") {
+        return {
+          ...f,
+          ...pickAddressPatch({
+            source,
+            unit: f.registered_unit,
+            blk_st: f.registered_blk_st,
+            postal_code: f.registered_postal_code,
+          }),
+        };
+      }
+      const idx = Number(source.replace("operational-", ""));
+      const addr = (f.operational_addresses || []).find((a) => a.index === idx);
+      return { ...f, ...pickAddressPatch({ source, ...(addr || {}) }) };
+    });
+  }
+
   function toggleListField(key, value) {
     setForm((f) => {
       const list = f[key] || [];
@@ -260,7 +311,15 @@ export default function JobsheetForm() {
         registered_unit: details.company.registered_unit || "",
         registered_blk_st: details.company.registered_blk_st || "",
         registered_postal_code: details.company.registered_postal_code || "",
-        same_as_registered: false,
+        operational_addresses: details.deal.operational_addresses || [],
+        number_of_outlets_sold: details.deal.number_of_outlets_sold || "",
+        // Auto-pick outlet #1's operational address as the deployment address -
+        // it's the right default for the vast majority of single-outlet deals.
+        ...pickAddressPatch(
+          (details.deal.operational_addresses || [])[0]
+            ? { source: `operational-${details.deal.operational_addresses[0].index}`, ...details.deal.operational_addresses[0] }
+            : {}
+        ),
         payment_status: PAYMENT_STATUS_OPTIONS.includes(details.deal.dealstage) ? details.deal.dealstage : "",
         salesperson: SALESPEOPLE.includes(details.deal.owner_name) ? details.deal.owner_name : f.salesperson,
       }));
@@ -348,7 +407,7 @@ export default function JobsheetForm() {
     setSuggestions([]);
     setShowSuggestions(false);
     setSearchError("");
-    setForm((f) => ({ ...emptyForm, deal_name: query }));
+    setForm((f) => ({ ...emptyForm, deal_name: query, deployment_address_source: "manual" }));
   }
 
   function handleSameAsContact(checked) {
@@ -357,16 +416,6 @@ export default function JobsheetForm() {
       same_as_contact: checked,
       client_name: checked ? f.contact_name : "",
       client_contact_no: checked ? formatSgPhone(f.contact_phone) : "",
-    }));
-  }
-
-  function handleSameAsRegistered(checked) {
-    setForm((f) => ({
-      ...f,
-      same_as_registered: checked,
-      deployment_unit: checked ? f.registered_unit : "",
-      deployment_blk_st: checked ? f.registered_blk_st : "",
-      deployment_postal_code: checked ? String(f.registered_postal_code || "") : "",
     }));
   }
 
@@ -661,35 +710,15 @@ export default function JobsheetForm() {
                 </div>
 
                 <div className="address-compare">
-                  <div className="address-card">
-                    <span className="address-card-label">Registered Address (HubSpot)</span>
-                    {form.registered_unit || form.registered_blk_st || form.registered_postal_code ? (
-                      <>
-                        <p className="address-card-value">Unit: {form.registered_unit || "-"}</p>
-                        <p className="address-card-value">Blk & St: {form.registered_blk_st || "-"}</p>
-                        <p className="address-card-value">Postal Code: {form.registered_postal_code || "-"}</p>
-                      </>
-                    ) : (
-                      <p className="address-card-value">Not on file in HubSpot</p>
-                    )}
-                    <label className="same-address-check">
-                      <input
-                        type="checkbox"
-                        checked={form.same_as_registered}
-                        disabled={!form.registered_unit && !form.registered_blk_st && !form.registered_postal_code}
-                        onChange={(e) => handleSameAsRegistered(e.target.checked)}
-                      />
-                      Use as deployment address
-                    </label>
-                  </div>
+                  <AddressSourcePicker form={form} onPick={handlePickAddress} />
                   <div className="address-fields">
-                    <TextField label="Deployment Address (Unit)" required value={form.deployment_unit} onChange={(v) => setField("deployment_unit", v)} />
-                    <TextField label="Deployment Address (Blk & St)" required value={form.deployment_blk_st} onChange={(v) => setField("deployment_blk_st", v)} />
+                    <TextField label="Deployment Address (Unit)" required value={form.deployment_unit} onChange={(v) => setDeploymentField("deployment_unit", v)} />
+                    <TextField label="Deployment Address (Blk & St)" required value={form.deployment_blk_st} onChange={(v) => setDeploymentField("deployment_blk_st", v)} />
                     <TextField
                       label="Deployment Address (Postal Code)"
                       required
                       value={form.deployment_postal_code}
-                      onChange={(v) => setField("deployment_postal_code", v)}
+                      onChange={(v) => setDeploymentField("deployment_postal_code", v)}
                       type="number"
                       error={form.deployment_postal_code && form.deployment_postal_code.length !== 6 ? `Must be exactly 6 digits (currently ${form.deployment_postal_code.length})` : ""}
                     />
@@ -914,6 +943,75 @@ export default function JobsheetForm() {
         )}
       </div>
     </div>
+    </div>
+  );
+}
+
+function AddressSourcePicker({ form, onPick }) {
+  const hasRegistered = !!(form.registered_unit || form.registered_blk_st || form.registered_postal_code);
+  const ops = form.operational_addresses || [];
+  const outletsSold = Number(form.number_of_outlets_sold) || 0;
+  const showMultiOutletHint = ops.length > 1 || outletsSold > 1;
+  const joinAddr = (parts) => parts.filter(Boolean).join(", ") || "-";
+
+  return (
+    <div className="address-card address-source-picker">
+      <span className="address-card-label">Deployment address — pick a source</span>
+
+      {ops.map((a) => {
+        const source = `operational-${a.index}`;
+        return (
+          <label key={source} className="address-source-option">
+            <input
+              type="radio"
+              name="addr-source"
+              checked={form.deployment_address_source === source}
+              onChange={() => onPick(source)}
+            />
+            <span>
+              <strong>{a.index === 1 ? "Operational Address — Primary Outlet" : `Operational Address ${a.index}`}</strong>
+              <span className="address-source-detail">{joinAddr([a.unit, a.blk_st, a.postal_code])}</span>
+            </span>
+          </label>
+        );
+      })}
+
+      <label className="address-source-option">
+        <input
+          type="radio"
+          name="addr-source"
+          checked={form.deployment_address_source === "registered"}
+          disabled={!hasRegistered}
+          onChange={() => onPick("registered")}
+        />
+        <span>
+          <strong>Registered Address (Company)</strong>
+          <span className="address-source-detail">
+            {hasRegistered
+              ? joinAddr([form.registered_unit, form.registered_blk_st, form.registered_postal_code])
+              : "Not on file in HubSpot"}
+          </span>
+        </span>
+      </label>
+
+      <label className="address-source-option">
+        <input
+          type="radio"
+          name="addr-source"
+          checked={form.deployment_address_source === "manual"}
+          onChange={() => onPick("manual")}
+        />
+        <span>
+          <strong>Enter manually</strong>
+          <span className="address-source-detail">Type the address in the fields on the right</span>
+        </span>
+      </label>
+
+      {showMultiOutletHint && (
+        <p className="address-source-hint">
+          This Deal covers {outletsSold || ops.length} outlets — submit one jobsheet per outlet.
+        </p>
+      )}
     </div>
   );
 }

@@ -192,6 +192,21 @@ HARDWARE_PROPERTY_MAP = {
     "buzzers": {"number": "number_of_buzzer_s_", "package": "buzzers_package"},
 }
 
+# Deal-level Operational Address properties, one row per outlet (up to 5). The
+# internal names are wildly inconsistent between outlets (HubSpot auto-generated
+# them from labels containing "&" / "&amp;" at different times), so they're
+# spelled out explicitly rather than derived from an index. Confirmed against the
+# EPOS portal's live deal property schema on 2026-09-01. Used so the jobsheet
+# form can offer the real shop address(es) as the deployment address instead of
+# only the Company's ACRA registered address.
+OPERATIONAL_ADDRESS_PROPS = [
+    ("operational_address__unit_", "operational_address__blk___st_", "operational_address__postal_code_"),
+    ("operational_address_unit_2", "operational_address_blk__st_2", "operational_address__postal_code__2"),
+    ("operational_address_unit_3", "operational_address_blk_amp_st_3", "operational_address_postal_code_3"),
+    ("operational_address_unit_4", "operational_address_blk__st_4", "operational_address_postal_code_4"),
+    ("operational_address_unit_5", "operational_address_blk__st_5", "operational_address_postal_code_5"),
+]
+
 router = APIRouter(tags=["jobsheet"])
 
 # One shared httpx client, reused across every outbound call (HubSpot, DingTalk)
@@ -451,17 +466,34 @@ async def _fetch_company_extra(company_id: Optional[str]) -> dict:
 
 @router.get("/api/deal-details/{deal_id}")
 async def deal_details(deal_id: str):
+    address_props = [p for row in OPERATIONAL_ADDRESS_PROPS for p in row]
     deal_data = await hs_request(
         "GET",
         f"/crm/v3/objects/deals/{deal_id}",
         params={
             "associations": "contacts,companies",
-            "properties": "dealname,amount,dealstage,pipeline,closedate,hubspot_owner_id",
+            "properties": ",".join(
+                ["dealname", "amount", "dealstage", "pipeline", "closedate",
+                 "hubspot_owner_id", "number_of_outlets_sold"] + address_props
+            ),
         },
     )
     deal_props = deal_data.get("properties", {})
     owner_name = await _fetch_deal_owner_name(deal_props.get("hubspot_owner_id"))
     stage_label = await _deal_stage_label(deal_props.get("pipeline"), deal_props.get("dealstage"))
+
+    # One entry per outlet slot that has any address component filled in - the
+    # frontend renders these as pickable deployment-address options.
+    operational_addresses = []
+    for idx, (unit_p, blk_st_p, postal_p) in enumerate(OPERATIONAL_ADDRESS_PROPS, start=1):
+        unit = (deal_props.get(unit_p) or "").strip()
+        blk_st = (deal_props.get(blk_st_p) or "").strip()
+        postal = (deal_props.get(postal_p) or "").strip()
+        if unit or blk_st or postal:
+            operational_addresses.append(
+                {"index": idx, "unit": unit, "blk_st": blk_st, "postal_code": postal}
+            )
+
     deal = {
         "id": deal_data.get("id"),
         "dealname": deal_props.get("dealname"),
@@ -469,6 +501,8 @@ async def deal_details(deal_id: str):
         "dealstage": stage_label,
         "pipeline": deal_props.get("pipeline"),
         "owner_name": owner_name,
+        "number_of_outlets_sold": deal_props.get("number_of_outlets_sold") or "",
+        "operational_addresses": operational_addresses,
     }
 
     contact = {}
