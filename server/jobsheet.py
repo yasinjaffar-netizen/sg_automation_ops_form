@@ -162,7 +162,7 @@ FIELD_PROPERTY_MAP = {
 }
 
 MULTI_SELECT_FIELDS = {
-    "special_payment_types", "integrations", "delivery_platforms",
+    "special_payment_types", "antom_cc_type", "integrations", "delivery_platforms",
     "additional_integrations", "requirements",
 }
 
@@ -604,7 +604,7 @@ class JobsheetForm(BaseModel):
     backend_domain: Optional[str] = ""
     tax_rule: str = Field(..., min_length=1)
     special_payment_types: list[str] = []
-    antom_cc_type: Optional[str] = ""
+    antom_cc_type: list[str] = []
     paynow_uob_docs: Optional[str] = ""
     paynow_completion: Optional[str] = ""
     nets_type: Optional[str] = ""
@@ -655,7 +655,7 @@ class JobsheetForm(BaseModel):
 
         spt = set(self.special_payment_types)
         if "Antom cc" not in spt:
-            self.antom_cc_type = ""
+            self.antom_cc_type = []
         if "Integrated PayNow" not in spt:
             self.paynow_uob_docs = ""
             self.paynow_completion = ""
@@ -911,7 +911,7 @@ def build_jobsheet_pdf(form: JobsheetForm, ticket_id: str, hubspot_url: str) -> 
     _pdf_field(pdf, "Tax Rule", form.tax_rule)
     _pdf_field(pdf, "Special Payment Types", ", ".join(form.special_payment_types))
     if "Antom cc" in form.special_payment_types:
-        _pdf_field(pdf, "  Antom CC", form.antom_cc_type)
+        _pdf_field(pdf, "  Antom CC", ", ".join(form.antom_cc_type))
     if "Integrated PayNow" in form.special_payment_types:
         _pdf_field(pdf, "  Integrated PayNow", form.paynow_uob_docs)
         _pdf_field(pdf, "  Payment completion", form.paynow_completion)
