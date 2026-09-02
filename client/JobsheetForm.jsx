@@ -111,7 +111,7 @@ const emptyForm = {
   backend_domain: "",
   tax_rule: "",
   special_payment_types: [],
-  antom_cc_type: "",
+  antom_cc_type: [],
   paynow_uob_docs: "",
   paynow_completion: "",
   nets_type: "",
@@ -470,7 +470,7 @@ export default function JobsheetForm() {
     if (form.setup_type === "Existing") req(form.existing_setup, "Existing Setup");
     req(form.store_condition, "Store Condition");
     req(form.tax_rule, "Tax Rule");
-    if (form.special_payment_types.includes("Antom cc")) req(form.antom_cc_type, "Antom CC type");
+    if (form.special_payment_types.includes("Antom cc")) req(form.antom_cc_type.length > 0, "Antom CC type");
     if (form.special_payment_types.includes("Integrated PayNow")) {
       req(form.paynow_uob_docs, "Integrated PayNow (UOB documents)");
       req(form.paynow_completion, "PayNow completion method");
@@ -780,7 +780,9 @@ export default function JobsheetForm() {
 
                 {form.special_payment_types.includes("Antom cc") && (
                   <div className="subsection">
-                    <SelectField label="Antom CC" required value={form.antom_cc_type} onChange={(v) => setField("antom_cc_type", v)} options={ANTOM_CC_OPTIONS} />
+                    <FieldGroup label="Antom CC" required>
+                      <ChipGroup options={ANTOM_CC_OPTIONS} selected={form.antom_cc_type} onToggle={(v) => toggleListField("antom_cc_type", v)} />
+                    </FieldGroup>
                   </div>
                 )}
                 {form.special_payment_types.includes("Integrated PayNow") && (
