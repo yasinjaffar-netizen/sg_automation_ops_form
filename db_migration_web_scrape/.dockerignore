@@ -1,0 +1,3 @@
+.env
+*.csv
+k8s-job.yaml
